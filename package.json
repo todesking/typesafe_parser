@@ -1,0 +1,10 @@
+{
+  "name": "typesafe-parser",
+  "version": "0.0.1",
+  "description": "An experimental typesafe parser-combinator library",
+  "main": "index.js",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.1.0-beta"
+  }
+}
