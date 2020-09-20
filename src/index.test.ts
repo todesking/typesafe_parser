@@ -1,4 +1,4 @@
-import {Parser, parse, constant} from "./"
+import {Parser, parse, constant, choose} from "./"
 
 function str(s: string): string { return s }
 
@@ -21,5 +21,19 @@ test('constatnt', () => {
 
   expect(() => {
     const ng: never = parse(parser, 'boo')
+  }).toThrow()
+})
+
+test('choose', () => {
+  const parser = choose(constant('foo', 1 as const), constant('bar', [2] as const))
+
+  const ok1: [1, ''] = parse(parser, 'foo')
+  eq(ok1, [1, ''])
+
+  const ok2: [readonly [2], ''] = parse(parser, 'bar')
+  eq(ok2, [[2], ''])
+
+  expect(() => {
+    const ng: never = parse(parser, 'buz')
   }).toThrow()
 })

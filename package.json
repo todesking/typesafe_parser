@@ -20,6 +20,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "tscheck": "tsc --noEmit",
     "lint": "eslint . --ext .ts",
     "fix": "eslint . --ext .ts --fix",
     "start": "yarn run build && node ./dist",
