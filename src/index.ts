@@ -69,15 +69,33 @@ export function pickFirst<T, P1 extends Parser<T>, P2 extends Parser<unknown>>(p
   }
 }
 
+export type PickSecond<T, P1 extends Parser<unknown>, P2 extends Parser<T>> = {
+  type: 'pickSecond',
+  p1: P1,
+  p2: P2,
+  _result: T
+}
+
+export function pickSecond<T, P1 extends Parser<unknown>, P2 extends Parser<T>>(p1: P1, p2: P2)
+: PickSecond<T, P1, P2> {
+  return {
+    type: 'pickSecond',
+    p1: p1,
+    p2: p2,
+    _result: resultTag
+  }
+}
 export type Parser<T> =
   Constant<T, string>
   | ChooseRec<T>
   | (SeqRec & {_result: T})
   | PickFirstRec<T>
+  | PickSecondRec<T>
 
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
 interface PickFirstRec<T> extends PickFirst<T, Parser<T>, Parser<unknown>> {}
+interface PickSecondRec<T> extends PickSecond<T, Parser<unknown>, Parser<T>> {}
 
 type Match<T extends U, U> = T
 
@@ -111,6 +129,14 @@ export type Parse<P extends Parser<unknown>, S extends string> =
           [T1, S2]
           : never
       : never
+    : P extends PickSecond<unknown, infer P1, infer P2> ?
+      Parse<P1, S> extends never ? never
+      : Parse<P1, S> extends [unknown, Match<infer S1, string>] ?
+        Parse<P2, S1> extends never ? never
+        : Parse<P2, S1> extends [infer T2, Match<infer S2, string>] ?
+          [T2, S2]
+          : never
+      : never
     : [P['_result'], string]
   : never
 
@@ -139,8 +165,15 @@ export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): 
     }
     case 'pickFirst': {
       const [v1, s1] = parse(generic_parser.p1, s)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const [v2, s2] = parse(generic_parser.p2, s1)
       return [v1, s2] as any
+    }
+    case 'pickSecond': {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const [v1, s1] = parse(generic_parser.p1, s)
+      const [v2, s2] = parse(generic_parser.p2, s1)
+      return [v2, s2] as any
     }
   }
 }
