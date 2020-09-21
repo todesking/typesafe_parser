@@ -1,4 +1,4 @@
-import {Parser, parse, constant, choose} from "./"
+import {Parser, parse, constant, choose, seq} from "./"
 
 function str(s: string): string { return s }
 
@@ -35,5 +35,22 @@ test('choose', () => {
 
   expect(() => {
     const ng: never = parse(parser, 'buz')
+  }).toThrow()
+})
+
+test('seq', () => {
+  const parser = seq(constant('foo', 1 as const), constant('bar', 2 as const))
+
+  const ok1: [[1, 2], ''] = parse(parser, 'foobar')
+  eq(ok1, [[1,2], ''])
+
+  const ok2: [[1, 2], 'abc'] = parse(parser, 'foobarabc')
+  eq(ok2, [[1, 2], 'abc'])
+
+  const ok3: [[1, 2], string] = parse(parser, str('foobarabc'))
+  eq(ok3, [[1, 2], 'abc'])
+
+  expect(() => {
+    const ng: never = parse(parser, 'barfoo')
   }).toThrow()
 })

@@ -35,17 +35,38 @@ export function choose<P1 extends Parser<unknown>, P2 extends Parser<unknown>>(
   }
 }
 
+type ParserResult<P extends Parser<unknown>> =
+  P extends {_result: infer T} ? T : never
+
+export type Seq<T1, T2, P1 extends Parser<T1>, P2 extends Parser<T2>> = {
+  type: 'seq',
+  p1: P1,
+  p2: P2,
+  _result: [T1, T2]
+}
+
+export function seq<T1, T2, P1 extends Parser<T1>, P2 extends Parser<T2>>(p1: P1, p2: P2)
+: Seq<T1, T2, P1, P2> {
+  return {
+    type: 'seq',
+    p1: p1,
+    p2: p2,
+    _result: resultTag
+  }
+}
+
 export type Parser<T> =
   Constant<T, string>
   | ChooseRec<T>
+  | (SeqRec & {_result: T})
 
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
+interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
 
 type Match<T extends U, U> = T
 
 export type Parse<P extends Parser<unknown>, S extends string> =
-  Parser<unknown> extends P ?
-    P extends Parser<infer T> ? [T, string] : never
+  Parser<unknown> extends P ? P extends Parser<infer T> ? [T, string] : never
   : P extends Constant<infer T, infer P> ?
     S extends `${P}${infer Rest}` ? [T, Rest] :
     string extends S ? [T, string] : never
@@ -54,6 +75,14 @@ export type Parse<P extends Parser<unknown>, S extends string> =
       Parse<P2, S> extends never ? never 
       : Parse<P2, S> extends [infer T1, infer S1] ? [T1, S1] : never
     : Parse<P1, S> extends [infer T1, infer S1] ? [T1, S1] : never
+  : P extends Seq<unknown, unknown, infer P1, infer P2> ?
+      Parse<P1, S> extends never ? never :
+      Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
+        Parse<P2, S1> extends never ? never :
+        Parse<P2, S1> extends [infer T2, infer S2] ?
+          [[T1, T2], S2]
+          : never
+        : never
   : [P['_result'], string]
 
 function parse_error(s: string): never {
@@ -74,5 +103,10 @@ export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): 
       } catch {
         return parse(generic_parser.p2, s) as any
       }
+    case 'seq': {
+      const [v1, s1] = parse(generic_parser.p1, s)
+      const [v2, s2] = parse(generic_parser.p2, s1)
+      return [[v1, v2], s2] as any
+    }
   }
 }
