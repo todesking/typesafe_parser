@@ -52,13 +52,32 @@ export function seq<T1, T2, P1 extends Parser<T1>, P2 extends Parser<T2>>(p1: P1
   }
 }
 
+export type PickFirst<T, P1 extends Parser<T>, P2 extends Parser<unknown>> = {
+  type: 'pickFirst',
+  p1: P1,
+  p2: P2,
+  _result: T
+}
+
+export function pickFirst<T, P1 extends Parser<T>, P2 extends Parser<unknown>>(p1: P1, p2: P2)
+: PickFirst<T, P1, P2> {
+  return {
+    type: 'pickFirst',
+    p1: p1,
+    p2: p2,
+    _result: resultTag
+  }
+}
+
 export type Parser<T> =
   Constant<T, string>
   | ChooseRec<T>
   | (SeqRec & {_result: T})
+  | PickFirstRec<T>
 
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
+interface PickFirstRec<T> extends PickFirst<T, Parser<T>, Parser<unknown>> {}
 
 type Match<T extends U, U> = T
 
@@ -70,16 +89,24 @@ export type Parse<P extends Parser<unknown>, S extends string> =
   : P extends Choose<unknown, infer P1, infer P2> ?
     Parse<P1, S> extends never ?
       Parse<P2, S> extends never ? never 
-      : Parse<P2, S> extends [infer T1, infer S1] ? [T1, S1] : never
-    : Parse<P1, S> extends [infer T1, infer S1] ? [T1, S1] : never
+      : Parse<P2, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : never
+    : Parse<P1, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : never
   : P extends Seq<unknown, unknown, infer P1, infer P2> ?
       Parse<P1, S> extends never ? never :
       Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
         Parse<P2, S1> extends never ? never :
-        Parse<P2, S1> extends [infer T2, infer S2] ?
+        Parse<P2, S1> extends [infer T2, Match<infer S2, string>] ?
           [[T1, T2], S2]
           : never
         : never
+  : P extends PickFirst<unknown, infer P1, infer P2> ?
+    Parse<P1, S> extends never ? never
+    : Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
+      Parse<P2, S1> extends never ? never
+      : Parse<P2, S1> extends [unknown, Match<infer S2, string>] ?
+        [T1, S2]
+        : never
+    : never
   : [P['_result'], string]
 
 function parse_error(s: string): never {
@@ -104,6 +131,11 @@ export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): 
       const [v1, s1] = parse(generic_parser.p1, s)
       const [v2, s2] = parse(generic_parser.p2, s1)
       return [[v1, v2], s2] as any
+    }
+    case 'pickFirst': {
+      const [v1, s1] = parse(generic_parser.p1, s)
+      const [v2, s2] = parse(generic_parser.p2, s1)
+      return [v1, s2] as any
     }
   }
 }

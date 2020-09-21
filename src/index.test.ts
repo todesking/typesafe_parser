@@ -1,4 +1,4 @@
-import { Parser, parse, constant, choose, seq } from "./";
+import { Parser, parse, constant, choose, seq, pickFirst } from "./";
 
 function str(s: string): string {
   return s;
@@ -60,7 +60,29 @@ test("seq", () => {
   const ok3: [[1, 2], string] = parse(parser, str("foobarabc"));
   eq(ok3, [[1, 2], "abc"]);
 
+  // const ok4: [[1, 2], string] = parse(parser as Parser<[1, 2]>, 'foobar')
+
   expect(() => {
     ensureNever(parse(parser, "barfoo"));
   }).toThrow();
 });
+
+test('pickFirst', () => {
+  const parser = pickFirst(constant('foo', 1 as const), constant('bar', 2 as const))
+
+  const ok1: [1, ''] = parse(parser, 'foobar')
+  eq(ok1, [1, ''])
+
+  const ok2: [1, 'x'] = parse(parser, 'foobarx')
+  eq(ok2, [1, 'x'])
+
+  const ok3: [1,string] = parse(parser, str('foobarx'))
+  eq(ok3, [1, 'x'])
+
+  expect(() => {
+    ensureNever(parse(parser, 'foo'))
+  }).toThrow()
+  expect(() => {
+    ensureNever(parse(parser, ''))
+  }).toThrow()
+})
