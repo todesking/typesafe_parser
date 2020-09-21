@@ -81,10 +81,13 @@ interface PickFirstRec<T> extends PickFirst<T, Parser<T>, Parser<unknown>> {}
 
 type Match<T extends U, U> = T
 
+// https://github.com/microsoft/TypeScript/issues/27024#issuecomment-421529650
+type Same<T, U> =
+  (<X>() => X extends T ? 1 : 2) extends (<X>() => X extends U ? 1 : 2) ? true : false
+
 export type Parse<P extends Parser<unknown>, S extends string> =
-  (() => P) extends (() => {_result: infer T}) ? (() => Parser<T>) extends (() => P) ? [T, string]
-    : Parser<unknown> extends P ? P extends Parser<infer T> ? [T, string] : never
-    : P extends Constant<infer T, infer P> ?
+  P[] extends {_result: infer T}[] ? Same<Parser<T>, P> extends true ? [T, string]
+    : P extends Constant<unknown, infer P> ?
       S extends `${P}${infer Rest}` ? [T, Rest] :
       string extends S ? [T, string] : never
     : P extends Choose<unknown, infer P1, infer P2> ?
