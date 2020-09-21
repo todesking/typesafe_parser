@@ -26,6 +26,12 @@ test("constatnt", () => {
   const ok3: [1, string] = parse(parser2, "foo!!!");
   eq(ok3, [1, "!!!"]);
 
+  const ok4: [1, string] = parse(parser as Parser<1>, "foobar");
+  eq(ok4, [1, "bar"]);
+
+  const ok5: [unknown, string] = parse(parser as Parser<unknown>, "foobar");
+  eq(ok5, [1, "bar"]);
+
   expect(() => {
     ensureNever(parse(parser, "boo"));
   }).toThrow();
@@ -60,29 +66,36 @@ test("seq", () => {
   const ok3: [[1, 2], string] = parse(parser, str("foobarabc"));
   eq(ok3, [[1, 2], "abc"]);
 
-  // const ok4: [[1, 2], string] = parse(parser as Parser<[1, 2]>, 'foobar')
+  const ok4: [[1, 2], string] = parse(parser as Parser<[1, 2]>, "foobar");
+  eq(ok4, [[1, 2], ""]);
 
   expect(() => {
     ensureNever(parse(parser, "barfoo"));
   }).toThrow();
 });
 
-test('pickFirst', () => {
-  const parser = pickFirst(constant('foo', 1 as const), constant('bar', 2 as const))
+test("pickFirst", () => {
+  const parser = pickFirst(
+    constant("foo", 1 as const),
+    constant("bar", 2 as const)
+  );
 
-  const ok1: [1, ''] = parse(parser, 'foobar')
-  eq(ok1, [1, ''])
+  const ok1: [1, ""] = parse(parser, "foobar");
+  eq(ok1, [1, ""]);
 
-  const ok2: [1, 'x'] = parse(parser, 'foobarx')
-  eq(ok2, [1, 'x'])
+  const ok2: [1, "x"] = parse(parser, "foobarx");
+  eq(ok2, [1, "x"]);
 
-  const ok3: [1,string] = parse(parser, str('foobarx'))
-  eq(ok3, [1, 'x'])
+  const ok3: [1, string] = parse(parser, str("foobarx"));
+  eq(ok3, [1, "x"]);
+
+  const ok4: [1, string] = parse(parser as Parser<1>, "foobar");
+  eq(ok4, [1, ""]);
 
   expect(() => {
-    ensureNever(parse(parser, 'foo'))
-  }).toThrow()
+    ensureNever(parse(parser, "foo"));
+  }).toThrow();
   expect(() => {
-    ensureNever(parse(parser, ''))
-  }).toThrow()
-})
+    ensureNever(parse(parser, ""));
+  }).toThrow();
+});

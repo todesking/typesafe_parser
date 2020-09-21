@@ -82,32 +82,34 @@ interface PickFirstRec<T> extends PickFirst<T, Parser<T>, Parser<unknown>> {}
 type Match<T extends U, U> = T
 
 export type Parse<P extends Parser<unknown>, S extends string> =
-  Parser<unknown> extends P ? P extends Parser<infer T> ? [T, string] : never
-  : P extends Constant<infer T, infer P> ?
-    S extends `${P}${infer Rest}` ? [T, Rest] :
-    string extends S ? [T, string] : never
-  : P extends Choose<unknown, infer P1, infer P2> ?
-    Parse<P1, S> extends never ?
-      Parse<P2, S> extends never ? never 
-      : Parse<P2, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : never
-    : Parse<P1, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : never
-  : P extends Seq<unknown, unknown, infer P1, infer P2> ?
-      Parse<P1, S> extends never ? never :
-      Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
-        Parse<P2, S1> extends never ? never :
-        Parse<P2, S1> extends [infer T2, Match<infer S2, string>] ?
-          [[T1, T2], S2]
+  (() => P) extends (() => {_result: infer T}) ? (() => Parser<T>) extends (() => P) ? [T, string]
+    : Parser<unknown> extends P ? P extends Parser<infer T> ? [T, string] : never
+    : P extends Constant<infer T, infer P> ?
+      S extends `${P}${infer Rest}` ? [T, Rest] :
+      string extends S ? [T, string] : never
+    : P extends Choose<unknown, infer P1, infer P2> ?
+      Parse<P1, S> extends never ?
+        Parse<P2, S> extends never ? never
+        : Parse<P2, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : never
+      : Parse<P1, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : never
+    : P extends Seq<unknown, unknown, infer P1, infer P2> ?
+        Parse<P1, S> extends never ? never :
+        Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
+          Parse<P2, S1> extends never ? never :
+          Parse<P2, S1> extends [infer T2, Match<infer S2, string>] ?
+            [[T1, T2], S2]
+            : never
           : never
-        : never
-  : P extends PickFirst<unknown, infer P1, infer P2> ?
-    Parse<P1, S> extends never ? never
-    : Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
-      Parse<P2, S1> extends never ? never
-      : Parse<P2, S1> extends [unknown, Match<infer S2, string>] ?
-        [T1, S2]
-        : never
-    : never
-  : [P['_result'], string]
+    : P extends PickFirst<unknown, infer P1, infer P2> ?
+      Parse<P1, S> extends never ? never
+      : Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
+        Parse<P2, S1> extends never ? never
+        : Parse<P2, S1> extends [unknown, Match<infer S2, string>] ?
+          [T1, S2]
+          : never
+      : never
+    : [P['_result'], string]
+  : never
 
 function parse_error(s: string): never {
   throw `Parse error at ${s}`
