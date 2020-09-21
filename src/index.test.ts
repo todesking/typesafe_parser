@@ -7,6 +7,7 @@ import {
   pickFirst,
   pickSecond,
   rep0,
+  prepend,
   Fail,
 } from "./";
 
@@ -151,4 +152,24 @@ test("rep0", () => {
 
   const ok5: [[1, 1], "a"] = parse(parser, "xxa");
   eq(ok5, [[1, 1], "a"]);
+});
+
+test("prepend", () => {
+  const parser = prepend(
+    constant("x", 1 as const),
+    rep0(constant("y", 2 as const))
+  );
+
+  const ok1: [[1], ""] = parse(parser, "x");
+  eq(ok1, [[1], ""]);
+
+  const ok2: [[1, 2], ""] = parse(parser, "xy");
+  eq(ok2, [[1, 2], ""]);
+
+  const ok3: [[1, 2, 2], "a"] = parse(parser, "xyya");
+  eq(ok3, [[1, 2, 2], "a"]);
+
+  expect(() => {
+    ensureFail(parse(parser, "y"));
+  }).toThrow();
 });

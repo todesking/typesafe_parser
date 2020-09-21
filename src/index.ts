@@ -101,6 +101,23 @@ export function rep0<P extends Parser<unknown>>(p: P)
   }
 }
 
+export type Prepend<T1, T2 extends unknown[], P1 extends Parser<T1>, P2 extends Parser<T2>> = {
+  type: 'prepend',
+  p1: P1,
+  p2: P2,
+  _result: [T1, ...T2]
+}
+
+export function prepend<P1 extends Parser<unknown>, P2 extends Parser<unknown[]>>(p1: P1, p2: P2)
+: Prepend<P1['_result'], P2['_result'], P1, P2> {
+  return {
+    type: 'prepend',
+    p1: p1,
+    p2: p2,
+    _result: resultTag
+  }
+}
+
 export type Parser<T> =
   Constant<T, string>
   | ChooseRec<T>
@@ -108,12 +125,14 @@ export type Parser<T> =
   | PickFirstRec<T>
   | PickSecondRec<T>
   | (Rep0Rec & {_result: T})
+  | (PrependRec & {_result: T})
 
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
 interface PickFirstRec<T> extends PickFirst<T, Parser<T>, Parser<unknown>> {}
 interface PickSecondRec<T> extends PickSecond<T, Parser<unknown>, Parser<T>> {}
 interface Rep0Rec extends Rep0<unknown, Parser<unknown>> {}
+interface PrependRec extends Prepend<unknown, unknown[], Parser<unknown>, Parser<unknown[]>> {}
 
 type Match<T extends U, U> = T
 
@@ -132,7 +151,6 @@ export type Parse<P extends Parser<unknown>, S extends string> =
   // S is string ?
   : string extends S ? [T, string]
 
-  // Rules
   : P extends Constant<unknown, infer P> ?
     S extends `${P}${infer Rest}` ? [T, Rest] :
     string extends S ? [T, string] : Fail<`${S} is not starts with ${P}`>
@@ -179,8 +197,20 @@ export type Parse<P extends Parser<unknown>, S extends string> =
           : Bug<['Rep0:1', Parse<P, S1>]>
         : Bug<'Rep0:2'>
     : Bug<'Rep0:3'>
+  : P extends Prepend<unknown, unknown[], infer P1, infer P2> ?
+    Parse<P1, S> extends infer R1 ?
+      R1 extends Fail<infer M> ? Fail<M> :
+      R1 extends [infer T1, Match<infer S1, string>] ?
+        Parse<P2, S1> extends infer R2 ?
+          R2 extends Fail<infer M> ? Fail<M> :
+          R2 extends [Match<infer T2, unknown[]>, Match<infer S2, string>] ?
+            [[T1, ...T2], S2]
+            : Bug<'Prepend:1'>
+        : Bug<'Prepend:2'> 
+      : Bug<'Prepend:3'>
+    : Bug<'Prepend:4'>
 
-  : Bug<'Root:1'>
+  : Bug<'Root:1(Unknown parser definition)'>
   : Bug<'Root:2'>
 
 function parse_error(s: string): never {
@@ -226,8 +256,13 @@ export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): 
       } catch {
         return [[], s] as any
       }
-      const [vs, s2] = parse(generic_parser, s1)
-      return [[v1, ...vs], s2] as any
+      const [v2, s2] = parse(generic_parser, s1)
+      return [[v1, ...v2], s2] as any
+    }
+    case 'prepend': {
+      const [v1, s1] = parse(generic_parser.p1, s)
+      const [v2, s2] = parse(generic_parser.p2, s1)
+      return [[v1, ...v2], s2] as any
     }
   }
 }
