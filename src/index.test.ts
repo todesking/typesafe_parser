@@ -6,6 +6,9 @@ function eq<T>(actual: T, expected: T): void {
   expect(actual).toStrictEqual(expected)
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function ensureNever(x: never): never { return x }
+
 test('constatnt', () => {
   const parser = constant('foo', 1 as const)
 
@@ -20,7 +23,7 @@ test('constatnt', () => {
   eq(ok3, [1, '!!!'])
 
   expect(() => {
-    const ng: never = parse(parser, 'boo')
+    ensureNever(parse(parser, 'boo'))
   }).toThrow()
 })
 
@@ -34,7 +37,7 @@ test('choose', () => {
   eq(ok2, [[2], ''])
 
   expect(() => {
-    const ng: never = parse(parser, 'buz')
+    ensureNever(parse(parser, 'buz'))
   }).toThrow()
 })
 
@@ -51,6 +54,6 @@ test('seq', () => {
   eq(ok3, [[1, 2], 'abc'])
 
   expect(() => {
-    const ng: never = parse(parser, 'barfoo')
+    ensureNever(parse(parser, 'barfoo'))
   }).toThrow()
 })

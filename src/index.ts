@@ -35,9 +35,6 @@ export function choose<P1 extends Parser<unknown>, P2 extends Parser<unknown>>(
   }
 }
 
-type ParserResult<P extends Parser<unknown>> =
-  P extends {_result: infer T} ? T : never
-
 export type Seq<T1, T2, P1 extends Parser<T1>, P2 extends Parser<T2>> = {
   type: 'seq',
   p1: P1,
@@ -70,7 +67,7 @@ export type Parse<P extends Parser<unknown>, S extends string> =
   : P extends Constant<infer T, infer P> ?
     S extends `${P}${infer Rest}` ? [T, Rest] :
     string extends S ? [T, string] : never
-  : P extends Choose<infer T, infer P1, infer P2> ?
+  : P extends Choose<unknown, infer P1, infer P2> ?
     Parse<P1, S> extends never ?
       Parse<P2, S> extends never ? never 
       : Parse<P2, S> extends [infer T1, infer S1] ? [T1, S1] : never
@@ -86,7 +83,7 @@ export type Parse<P extends Parser<unknown>, S extends string> =
   : [P['_result'], string]
 
 function parse_error(s: string): never {
-  throw '!!!'
+  throw `Parse error at ${s}`
 }
 
 export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): Parse<P, S> {
