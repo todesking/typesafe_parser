@@ -6,6 +6,8 @@ import {
   seq,
   pickFirst,
   pickSecond,
+  rep0,
+  Fail,
 } from "./";
 
 function str(s: string): string {
@@ -17,9 +19,7 @@ function eq<T>(actual: T, expected: T): void {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function ensureNever(x: never): never {
-  return x;
-}
+function ensureFail<T>(x: Fail<T>): void {}
 
 test("constatnt", () => {
   const parser = constant("foo", 1 as const);
@@ -41,7 +41,7 @@ test("constatnt", () => {
   eq(ok5, [1, "bar"]);
 
   expect(() => {
-    ensureNever(parse(parser, "boo"));
+    ensureFail(parse(parser, "boo"));
   }).toThrow();
 });
 
@@ -58,7 +58,7 @@ test("choose", () => {
   eq(ok2, [[2], ""]);
 
   expect(() => {
-    ensureNever(parse(parser, "buz"));
+    ensureFail(parse(parser, "buz"));
   }).toThrow();
 });
 
@@ -78,7 +78,7 @@ test("seq", () => {
   eq(ok4, [[1, 2], ""]);
 
   expect(() => {
-    ensureNever(parse(parser, "barfoo"));
+    ensureFail(parse(parser, "barfoo"));
   }).toThrow();
 });
 
@@ -101,10 +101,10 @@ test("pickFirst", () => {
   eq(ok4, [1, ""]);
 
   expect(() => {
-    ensureNever(parse(parser, "foo"));
+    ensureFail(parse(parser, "foo"));
   }).toThrow();
   expect(() => {
-    ensureNever(parse(parser, ""));
+    ensureFail(parse(parser, ""));
   }).toThrow();
 });
 
@@ -127,9 +127,28 @@ test("pickSecond", () => {
   eq(ok4, [2, ""]);
 
   expect(() => {
-    ensureNever(parse(parser, "foo"));
+    ensureFail(parse(parser, "foo"));
   }).toThrow();
   expect(() => {
-    ensureNever(parse(parser, ""));
+    ensureFail(parse(parser, ""));
   }).toThrow();
+});
+
+test("rep0", () => {
+  const parser = rep0(constant("x", 1 as const));
+
+  const ok1: [[], ""] = parse(parser, "");
+  eq(ok1, [[], ""]);
+
+  const ok2: [[], "a"] = parse(parser, "a");
+  eq(ok2, [[], "a"]);
+
+  const ok3: [[1], ""] = parse(parser, "x");
+  eq(ok3, [[1], ""]);
+
+  const ok4: [[1, 1], ""] = parse(parser, "xx");
+  eq(ok4, [[1, 1], ""]);
+
+  const ok5: [[1, 1], "a"] = parse(parser, "xxa");
+  eq(ok5, [[1, 1], "a"]);
 });
