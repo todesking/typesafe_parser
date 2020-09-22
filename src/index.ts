@@ -152,6 +152,15 @@ export function join<P extends Parser<string[]>>(p: P)
   }
 }
 
+export function wrap<
+P1 extends Parser<unknown>,
+P2 extends Parser<unknown>,
+P3 extends Parser<unknown>
+>(p1: P1, p2: P2, p3: P3)
+: PickSecond<P2['_result'], P1, PickFirst<P2['_result'], P2, P3>> {
+  return pickSecond(p1, pickFirst(p2, p3))
+}
+
 export type Parser<T> =
   (Read<string> & {_result: T})
   | Constant<T, string>

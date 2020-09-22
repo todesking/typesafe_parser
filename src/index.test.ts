@@ -12,6 +12,7 @@ import {
   Fail,
   join,
   read,
+  wrap,
 } from "./";
 
 function str(s: string): string {
@@ -212,4 +213,14 @@ test("join", () => {
 
   const ok2: ["yyy", ""] = parse(parser, "xxx");
   eq(ok2, ["yyy", ""]);
+});
+
+test("wrap", () => {
+  const parser = wrap(read("("), rep0(read("a")), read(")"));
+
+  const ok1: [[], ""] = parse(parser, "()");
+  eq(ok1, [[], ""]);
+
+  const ok2: [["a", "a"], ""] = parse(parser, "(aa)");
+  eq(ok2, [["a", "a"], ""]);
 });
