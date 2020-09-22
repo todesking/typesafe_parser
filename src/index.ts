@@ -118,6 +118,11 @@ export function prepend<P1 extends Parser<unknown>, P2 extends Parser<unknown[]>
   }
 }
 
+export function rep1<P extends Parser<unknown>>(p: P)
+: Prepend<P['_result'], Rep0<P['_result'], P>['_result'], P, Rep0<P['_result'], P>> {
+  return prepend(p, rep0(p))
+}
+
 export type Parser<T> =
   Constant<T, string>
   | ChooseRec<T>

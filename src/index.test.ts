@@ -8,6 +8,7 @@ import {
   pickSecond,
   rep0,
   prepend,
+  rep1,
   Fail,
 } from "./";
 
@@ -171,5 +172,18 @@ test("prepend", () => {
 
   expect(() => {
     ensureFail(parse(parser, "y"));
+  }).toThrow();
+});
+
+test("rep1", () => {
+  const parser = rep1(constant("x", 1 as const));
+
+  const ok1: [[1], ""] = parse(parser, "x");
+  eq(ok1, [[1], ""]);
+  const ok2: [[1, 1], "a"] = parse(parser, "xxa");
+  eq(ok2, [[1, 1], "a"]);
+
+  expect(() => {
+    ensureFail(parse(parser, "a"));
   }).toThrow();
 });
