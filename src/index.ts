@@ -186,6 +186,11 @@ export function rep1sep<P1 extends Parser<unknown>, P2 extends Parser<unknown>>(
   return prepend(p1, rep0(pickSecond(p2, p1)))
 }
 
+export function rep0sep<P1 extends Parser<unknown>, P2 extends Parser<unknown>>(p1: P1, p2: P2)
+: Opt<Rep1Sep<P1, P2>['_result'] | [], Rep1Sep<P1, P2>, []> {
+  return opt(rep1sep(p1, p2), [])
+}
+
 export type Parser<T> =
   (Read<string> & {_result: T})
   | Constant<T, string>

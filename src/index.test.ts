@@ -14,6 +14,7 @@ import {
   read,
   wrap,
   rep1sep,
+  rep0sep,
   opt,
 } from "./";
 
@@ -239,6 +240,19 @@ test("rep1sep", () => {
   expect(() => {
     ensureFail(parse(parser, "x"));
   }).toThrow();
+});
+
+test("rep0sep", () => {
+  const parser = rep0sep(read("a"), read(","));
+
+  const ok1: [["a"], ""] = parse(parser, "a");
+  eq(ok1, [["a"], ""]);
+
+  const ok2: [["a", "a"], "x"] = parse(parser, "a,ax");
+  eq(ok2, [["a", "a"], "x"]);
+
+  const ok3: [[], 'x'] = parse(parser, "x");
+  eq(ok3, [[], 'x'])
 });
 
 test("opt", () => {
