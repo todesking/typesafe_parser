@@ -13,6 +13,7 @@ import {
   join,
   read,
   wrap,
+  rep1sep,
 } from "./";
 
 function str(s: string): string {
@@ -223,4 +224,18 @@ test("wrap", () => {
 
   const ok2: [["a", "a"], ""] = parse(parser, "(aa)");
   eq(ok2, [["a", "a"], ""]);
+});
+
+test("rep1sep", () => {
+  const parser = rep1sep(read("a"), read(","));
+
+  const ok1: [["a"], ""] = parse(parser, "a");
+  eq(ok1, [["a"], ""]);
+
+  const ok2: [["a", "a"], "x"] = parse(parser, "a,ax");
+  eq(ok2, [["a", "a"], "x"]);
+
+  expect(() => {
+    ensureFail(parse(parser, "x"));
+  }).toThrow();
 });
