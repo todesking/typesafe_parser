@@ -170,9 +170,9 @@ export function join<P extends Parser<string[]>>(p: P)
 }
 
 export function wrap<
-P1 extends Parser<unknown>,
-P2 extends Parser<unknown>,
-P3 extends Parser<unknown>
+  P1 extends Parser<unknown>,
+  P2 extends Parser<unknown>,
+  P3 extends Parser<unknown>
 >(p1: P1, p2: P2, p3: P3)
 : PickSecond<P2['_result'], P1, PickFirst<P2['_result'], P2, P3>> {
   return pickSecond(p1, pickFirst(p2, p3))
@@ -191,6 +191,20 @@ export function rep0sep<P1 extends Parser<unknown>, P2 extends Parser<unknown>>(
   return opt(rep1sep(p1, p2), [])
 }
 
+export type Ref<T, K extends string> = {
+  type: 'ref',
+  key: K,
+  _result: T
+}
+
+export function ref<T>(): <K extends string>(key: K) => Ref<T, K> {
+  return <K>(key: K) => ({
+    type: 'ref',
+    key: key,
+    _result: resultTag
+  })
+}
+
 export type Parser<T> =
   (Read<string> & {_result: T})
   | Constant<T, string>
@@ -202,6 +216,7 @@ export type Parser<T> =
   | (PrependRec & {_result: T})
   | (JoinRec & {_result: T})
   | (OptRec & {_result: T})
+  | Ref<T, string>
 
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
@@ -228,7 +243,7 @@ type _Join<T extends string[]> =
 type Same<T, U> =
   (<X>() => X extends T ? 1 : 2) extends (<X>() => X extends U ? 1 : 2) ? true : false
 
-export type Parse<P extends Parser<unknown>, S extends string> =
+export type Parse<P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>> =
   // P is Parser<T> ?
   P[] extends {_result: infer T}[] ? Same<Parser<T>, P> extends true ? [T, string]
 
@@ -245,58 +260,58 @@ export type Parse<P extends Parser<unknown>, S extends string> =
     string extends S ? [T, string] : Fail<`${S} is not starts with ${P}`>
 
   : P extends Choose<unknown, infer P1, infer P2> ?
-    Parse<P1, S> extends Fail<unknown> ?
-      Parse<P2, S> extends Fail<unknown> ? Fail<`Choose failed at ${S}`>
-      : Parse<P2, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : Bug<'Choose:1'>
-    : Parse<P1, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : Bug<'Choose:2'>
+    Parse<P1, S, E> extends Fail<unknown> ?
+      Parse<P2, S, E> extends Fail<unknown> ? Fail<`Choose failed at ${S}`>
+      : Parse<P2, S, E> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : Bug<'Choose:1'>
+    : Parse<P1, S, E> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : Bug<'Choose:2'>
 
   : P extends Seq<unknown, unknown, infer P1, infer P2> ?
-      Parse<P1, S> extends Fail<infer Err> ? Fail<Err> :
-      Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
-        Parse<P2, S1> extends Fail<infer Err> ? Fail<Err> :
-        Parse<P2, S1> extends [infer T2, Match<infer S2, string>] ?
+      Parse<P1, S, E> extends Fail<infer Err> ? Fail<Err> :
+      Parse<P1, S, E> extends [infer T1, Match<infer S1, string>] ?
+        Parse<P2, S1, E> extends Fail<infer Err> ? Fail<Err> :
+        Parse<P2, S1, E> extends [infer T2, Match<infer S2, string>] ?
           [[T1, T2], S2]
           : Bug<'Seq:1'>
         : Bug<'Seq:2'>
 
   : P extends PickFirst<unknown, infer P1, infer P2> ?
-    Parse<P1, S> extends Fail<infer M> ? Fail<M>
-    : Parse<P1, S> extends [infer T1, Match<infer S1, string>] ?
-      Parse<P2, S1> extends Fail<infer M> ? Fail<M>
-      : Parse<P2, S1> extends [unknown, Match<infer S2, string>] ?
+    Parse<P1, S, E> extends Fail<infer M> ? Fail<M>
+    : Parse<P1, S, E> extends [infer T1, Match<infer S1, string>] ?
+      Parse<P2, S1, E> extends Fail<infer M> ? Fail<M>
+      : Parse<P2, S1, E> extends [unknown, Match<infer S2, string>] ?
         [T1, S2]
         : Bug<'PickFirst:1'>
     : Bug<'PickFirst:2'>
 
   : P extends PickSecond<unknown, infer P1, infer P2> ?
-    Parse<P1, S> extends Fail<infer M> ? Fail<M>
-    : Parse<P1, S> extends [unknown, Match<infer S1, string>] ?
-      Parse<P2, S1> extends Fail<infer M> ? Fail<M>
-      : Parse<P2, S1> extends [infer T2, Match<infer S2, string>] ?
+    Parse<P1, S, E> extends Fail<infer M> ? Fail<M>
+    : Parse<P1, S, E> extends [unknown, Match<infer S1, string>] ?
+      Parse<P2, S1, E> extends Fail<infer M> ? Fail<M>
+      : Parse<P2, S1, E> extends [infer T2, Match<infer S2, string>] ?
         [T2, S2]
         : Bug<'PickSecond:1'>
     : Bug<'PickSecond:2'>
 
   : P extends Rep0<unknown, infer P1> ?
-    Parse<P1, S> extends infer R1 ?
+    Parse<P1, S, E> extends infer R1 ?
       R1 extends Fail<unknown> ? [[], S]
       : R1 extends [infer T1, Match<infer S1, string>] ?
-        Parse<P, S1> extends [Match<infer T2, unknown[]>, Match<infer S2, string>] ?
+        Parse<P, S1, E> extends [Match<infer T2, unknown[]>, Match<infer S2, string>] ?
           [[T1, ...T2], S2]
-          : Bug<['Rep0:1', Parse<P, S1>]>
+          : Bug<['Rep0:1', Parse<P, S1, E>]>
         : Bug<'Rep0:2'>
     : Bug<'Rep0:3'>
 
   : P extends Opt<unknown, infer P1, infer D> ?
-    Parse<P1, S> extends Fail<unknown> ? [D, S] :
-    Parse<P1, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] :
+    Parse<P1, S, E> extends Fail<unknown> ? [D, S] :
+    Parse<P1, S, E> extends [infer T1, Match<infer S1, string>] ? [T1, S1] :
     Bug<'Opt:1'>
 
   : P extends Prepend<unknown, unknown[], infer P1, infer P2> ?
-    Parse<P1, S> extends infer R1 ?
+    Parse<P1, S, E> extends infer R1 ?
       R1 extends Fail<infer M> ? Fail<M> :
       R1 extends [infer T1, Match<infer S1, string>] ?
-        Parse<P2, S1> extends infer R2 ?
+        Parse<P2, S1, E> extends infer R2 ?
           R2 extends Fail<infer M> ? Fail<M> :
           R2 extends [Match<infer T2, unknown[]>, Match<infer S2, string>] ?
             [[T1, ...T2], S2]
@@ -305,9 +320,13 @@ export type Parse<P extends Parser<unknown>, S extends string> =
       : Bug<'Prepend:3'>
     : Bug<'Prepend:4'>
 
+  : P extends Ref<unknown, infer K> ?
+    K extends keyof E ?  Parse<E[K], S, E>
+    : Fail<`Reference not found: ${K}`>
+
   : P extends Join<string[], infer P1> ?
-    Parse<P1, S> extends Fail<infer M> ? Fail<M> :
-    Parse<P1, S> extends [Match<infer T1, string[]>, Match<infer S1, string>] ?
+    Parse<P1, S, E> extends Fail<infer M> ? Fail<M> :
+    Parse<P1, S, E> extends [Match<infer T1, string[]>, Match<infer S1, string>] ?
       [_Join<T1>, S1]
       : Bug<'Join:1'>
 
@@ -318,7 +337,8 @@ function parse_error(s: string): never {
   throw `Parse error at ${s}`
 }
 
-export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): Parse<P, S> {
+export function parse<P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>>(p: P, s: S, env?: E)
+: Parse<P, S, typeof env extends undefined ? Record<string, Parser<unknown>> : E> {
   const generic_parser: Parser<P['_result']> = p
   switch(generic_parser.type) {
     case 'read': {
@@ -381,6 +401,12 @@ export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): 
     case 'join': {
       const [v1, s1] = parse(generic_parser.p, s)
       return [v1.join(''), s1] as any
+    }
+    case 'ref': {
+      if(!env) throw `Reference not found: ${generic_parser.key}`
+      const parser = (env || {})[generic_parser.key]
+      if(!parser) throw `Reference not found: ${generic_parser.key}`
+      return parse(parser, s) as any
     }
   }
 }

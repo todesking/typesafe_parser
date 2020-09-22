@@ -16,6 +16,7 @@ import {
   rep1sep,
   rep0sep,
   opt,
+  ref,
 } from "./";
 
 function str(s: string): string {
@@ -242,6 +243,16 @@ test("rep1sep", () => {
   }).toThrow();
 });
 
+test("opt", () => {
+  const parser = opt(read("a"), null);
+
+  const ok1: ["a", "b"] = parse(parser, "ab");
+  eq(ok1, ["a", "b"]);
+
+  const ok2: [null, "b"] = parse(parser, "b");
+  eq(ok2, [null, "b"]);
+});
+
 test("rep0sep", () => {
   const parser = rep0sep(read("a"), read(","));
 
@@ -251,16 +262,36 @@ test("rep0sep", () => {
   const ok2: [["a", "a"], "x"] = parse(parser, "a,ax");
   eq(ok2, [["a", "a"], "x"]);
 
-  const ok3: [[], 'x'] = parse(parser, "x");
-  eq(ok3, [[], 'x'])
+  const ok3: [[], "x"] = parse(parser, "x");
+  eq(ok3, [[], "x"]);
 });
 
-test("opt", () => {
-  const parser = opt(read("a"), null);
+test("ref", () => {
+  // expr := name | tuple
+  // name := /a+/
+  // tuple := '(' expr (',' expr)* ')'
+  type Name = string;
+  type Tuple = Expr[];
+  type Expr = Name | Tuple;
 
-  const ok1: ["a", "b"] = parse(parser, "ab");
-  eq(ok1, ["a", "b"]);
+  const exprRef = ref<Expr>()("expr");
+  const name = join(rep1(read("a")));
+  const tuple = wrap(read("("), rep0sep(exprRef, read(",")), read(")"));
+  const expr = choose(name, tuple);
+  const env = { expr: expr } as const;
 
-  const ok2: [null, "b"] = parse(parser, "b");
-  eq(ok2, [null, "b"]);
+  const ok1: [[], ""] = parse(expr, "()", env);
+  eq(ok1, [[], ""]);
+
+  const ok2: ["aaa", ""] = parse(expr, "aaa", env);
+  eq(ok2, ["aaa", ""]);
+
+  const ok3: [["a"], ""] = parse(expr, "(a)", env);
+  eq(ok3, [["a"], ""]);
+
+  // FIXME: TS2589
+  // const ok4: [['a', 'a'], ''] = parse(expr, '(a,a)', env)
+  // eq(ok4, [['a', 'a'], ''])
+  // const ok5: [[[]], ''] = parse(expr, '(())', env)
+  // eq(ok5, [[[]], ''])
 });
