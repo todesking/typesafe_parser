@@ -123,6 +123,21 @@ export function rep1<P extends Parser<unknown>>(p: P)
   return prepend(p, rep0(p))
 }
 
+export type Join<T extends string[], P extends Parser<T>> = {
+  type: 'join',
+  p: P,
+  _result: T
+}
+
+export function join<P extends Parser<string[]>>(p: P)
+: Join<P['_result'], P> {
+  return {
+    type: 'join',
+    p: p,
+    _result: resultTag
+  }
+}
+
 export type Parser<T> =
   Constant<T, string>
   | ChooseRec<T>
@@ -131,6 +146,7 @@ export type Parser<T> =
   | PickSecondRec<T>
   | (Rep0Rec & {_result: T})
   | (PrependRec & {_result: T})
+  | (JoinRec & {_result: T})
 
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
@@ -138,12 +154,19 @@ interface PickFirstRec<T> extends PickFirst<T, Parser<T>, Parser<unknown>> {}
 interface PickSecondRec<T> extends PickSecond<T, Parser<unknown>, Parser<T>> {}
 interface Rep0Rec extends Rep0<unknown, Parser<unknown>> {}
 interface PrependRec extends Prepend<unknown, unknown[], Parser<unknown>, Parser<unknown[]>> {}
+interface JoinRec extends Join<string[], Parser<string[]>> {}
 
 type Match<T extends U, U> = T
 
 export type Fail<Msg> = {fail: Msg}
 
 type Bug<Msg> = {bug: Msg}
+
+type _Join<T extends string[]> =
+  string[] extends T ? string :
+  T extends [] ? '' :
+  T extends [Match<infer T1, string>, ...Match<infer T2, string[]>] ? `${T1}${_Join<T2>}` :
+  never
 
 // https://github.com/microsoft/TypeScript/issues/27024#issuecomment-421529650
 type Same<T, U> =
@@ -202,6 +225,7 @@ export type Parse<P extends Parser<unknown>, S extends string> =
           : Bug<['Rep0:1', Parse<P, S1>]>
         : Bug<'Rep0:2'>
     : Bug<'Rep0:3'>
+
   : P extends Prepend<unknown, unknown[], infer P1, infer P2> ?
     Parse<P1, S> extends infer R1 ?
       R1 extends Fail<infer M> ? Fail<M> :
@@ -214,6 +238,12 @@ export type Parse<P extends Parser<unknown>, S extends string> =
         : Bug<'Prepend:2'> 
       : Bug<'Prepend:3'>
     : Bug<'Prepend:4'>
+
+  : P extends Join<string[], infer P1> ?
+    Parse<P1, S> extends Fail<infer M> ? Fail<M> :
+    Parse<P1, S> extends [Match<infer T1, string[]>, Match<infer S1, string>] ?
+      [_Join<T1>, S1]
+      : Bug<'Join:1'>
 
   : Bug<'Root:1(Unknown parser definition)'>
   : Bug<'Root:2'>
@@ -268,6 +298,10 @@ export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): 
       const [v1, s1] = parse(generic_parser.p1, s)
       const [v2, s2] = parse(generic_parser.p2, s1)
       return [[v1, ...v2], s2] as any
+    }
+    case 'join': {
+      const [v1, s1] = parse(generic_parser.p, s)
+      return [v1.join(''), s1] as any
     }
   }
 }

@@ -10,6 +10,7 @@ import {
   prepend,
   rep1,
   Fail,
+  join,
 } from "./";
 
 function str(s: string): string {
@@ -186,4 +187,14 @@ test("rep1", () => {
   expect(() => {
     ensureFail(parse(parser, "a"));
   }).toThrow();
+});
+
+test("join", () => {
+  const parser = join(rep0(constant("x", "y" as const)));
+
+  const ok1: ["", "a"] = parse(parser, "a");
+  eq(ok1, ["", "a"]);
+
+  const ok2: ["yyy", ""] = parse(parser, "xxx");
+  eq(ok2, ["yyy", ""]);
 });
