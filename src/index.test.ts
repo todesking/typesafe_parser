@@ -14,6 +14,7 @@ import {
   read,
   wrap,
   rep1sep,
+  opt,
 } from "./";
 
 function str(s: string): string {
@@ -238,4 +239,14 @@ test("rep1sep", () => {
   expect(() => {
     ensureFail(parse(parser, "x"));
   }).toThrow();
+});
+
+test("opt", () => {
+  const parser = opt(read("a"), null);
+
+  const ok1: ["a", "b"] = parse(parser, "ab");
+  eq(ok1, ["a", "b"]);
+
+  const ok2: [null, "b"] = parse(parser, "b");
+  eq(ok2, [null, "b"]);
 });

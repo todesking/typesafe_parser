@@ -115,6 +115,23 @@ export function rep0<P extends Parser<unknown>>(p: P)
   }
 }
 
+export type Opt<T, P extends Parser<T>, D> = {
+  type: 'opt',
+  p: P,
+  default: D,
+  _result: T
+}
+
+export function opt<P extends Parser<unknown>, D>(p: P, d: D)
+: Opt<P['_result'] | D, P, D> {
+  return {
+    type: 'opt',
+    p: p,
+    default: d,
+    _result: resultTag
+  }
+}
+
 export type Prepend<T1, T2 extends unknown[], P1 extends Parser<T1>, P2 extends Parser<T2>> = {
   type: 'prepend',
   p1: P1,
@@ -179,6 +196,7 @@ export type Parser<T> =
   | (Rep0Rec & {_result: T})
   | (PrependRec & {_result: T})
   | (JoinRec & {_result: T})
+  | (OptRec & {_result: T})
 
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
@@ -187,6 +205,7 @@ interface PickSecondRec<T> extends PickSecond<T, Parser<unknown>, Parser<T>> {}
 interface Rep0Rec extends Rep0<unknown, Parser<unknown>> {}
 interface PrependRec extends Prepend<unknown, unknown[], Parser<unknown>, Parser<unknown[]>> {}
 interface JoinRec extends Join<string[], Parser<string[]>> {}
+interface OptRec extends Opt<unknown, Parser<unknown>, unknown> {}
 
 type Match<T extends U, U> = T
 
@@ -263,6 +282,11 @@ export type Parse<P extends Parser<unknown>, S extends string> =
         : Bug<'Rep0:2'>
     : Bug<'Rep0:3'>
 
+  : P extends Opt<unknown, infer P1, infer D> ?
+    Parse<P1, S> extends Fail<unknown> ? [D, S] :
+    Parse<P1, S> extends [infer T1, Match<infer S1, string>] ? [T1, S1] :
+    Bug<'Opt:1'>
+
   : P extends Prepend<unknown, unknown[], infer P1, infer P2> ?
     Parse<P1, S> extends infer R1 ?
       R1 extends Fail<infer M> ? Fail<M> :
@@ -336,6 +360,13 @@ export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): 
       }
       const [v2, s2] = parse(generic_parser, s1)
       return [[v1, ...v2], s2] as any
+    }
+    case 'opt': {
+      try {
+        return parse(generic_parser.p, s) as any
+      } catch {
+        return [generic_parser.default, s] as any
+      }
     }
     case 'prepend': {
       const [v1, s1] = parse(generic_parser.p1, s)
