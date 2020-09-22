@@ -1,5 +1,19 @@
 const resultTag: any = null
 
+export type Read<P extends string> = {
+  type: 'read',
+  pattern: P,
+  _result: P
+}
+
+export function read<P extends string>(p: P): Read<P> {
+  return {
+    type: 'read',
+    pattern: p,
+    _result: p
+  }
+}
+
 export type Constant<T, P extends string> = {
   type: 'constant',
   pattern: P,
@@ -139,7 +153,8 @@ export function join<P extends Parser<string[]>>(p: P)
 }
 
 export type Parser<T> =
-  Constant<T, string>
+  (Read<string> & {_result: T})
+  | Constant<T, string>
   | ChooseRec<T>
   | (SeqRec & {_result: T})
   | PickFirstRec<T>
@@ -178,6 +193,11 @@ export type Parse<P extends Parser<unknown>, S extends string> =
 
   // S is string ?
   : string extends S ? [T, string]
+
+  : P extends Read<infer T> ?
+    S extends `${T}${infer Rest}` ? [T, Rest] :
+    string extends S ? [T, string] :
+    Fail<`${S} is not starts with ${T}`>
 
   : P extends Constant<unknown, infer P> ?
     S extends `${P}${infer Rest}` ? [T, Rest] :
@@ -255,6 +275,12 @@ function parse_error(s: string): never {
 export function parse<P extends Parser<unknown>, S extends string>(p: P, s: S): Parse<P, S> {
   const generic_parser: Parser<P['_result']> = p
   switch(generic_parser.type) {
+    case 'read': {
+      if(s.startsWith(generic_parser.pattern)) {
+        return [generic_parser.pattern, s.substr(generic_parser.pattern.length)] as any
+      }
+      return parse_error(s)
+    }
     case 'constant':
       if(s.startsWith(generic_parser.pattern)) {
         return [generic_parser.value, s.substr(generic_parser.pattern.length)] as any

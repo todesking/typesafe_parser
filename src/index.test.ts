@@ -11,6 +11,7 @@ import {
   rep1,
   Fail,
   join,
+  read,
 } from "./";
 
 function str(s: string): string {
@@ -23,6 +24,20 @@ function eq<T>(actual: T, expected: T): void {
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ensureFail<T>(x: Fail<T>): void {}
+
+test("read", () => {
+  const parser = read("a");
+
+  const ok1: ["a", "abb"] = parse(parser, "aabb");
+  eq(ok1, ["a", "abb"]);
+
+  expect(() => {
+    ensureFail(parse(parser, ""));
+  }).toThrow();
+  expect(() => {
+    ensureFail(parse(parser, "ba"));
+  }).toThrow();
+});
 
 test("constatnt", () => {
   const parser = constant("foo", 1 as const);
