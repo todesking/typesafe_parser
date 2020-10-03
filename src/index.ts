@@ -54,7 +54,7 @@ export function choose<P1 extends Parser<unknown>, P2 extends Parser<unknown>>(
   }
 }
 
-export type Seq<T1, T2, P1 extends Parser<unknown>, P2 extends Parser<unknown>> = {
+export type Seq<T1, T2, P1 extends Parser<T1>, P2 extends Parser<T2>> = {
   type: 'seq',
   p1: P1,
   p2: P2,
@@ -223,6 +223,9 @@ export type Parser<T> =
   | (OptRec & {_result: T})
   | Ref<T, string>
 
+type ParseResult<P extends Parser<unknown>> =
+  P[] extends Parser<infer T>[] ? T : never
+
 interface ConstantRec<T> extends Constant<T, Parser<unknown>> {}
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
@@ -247,16 +250,264 @@ type _Join<T extends string[]> =
 
 // https://github.com/microsoft/TypeScript/issues/27024#issuecomment-421529650
 type Same<T, U> =
-  (<X>() => X extends T ? 1 : 2) extends (<X>() => X extends U ? 1 : 2) ? true : false
+  (<X>() => X extends T ? 1 : 2) extends (<X>() => X extends U ? 1 : 2)
+  ? true
+  : false
+
+type IRead<V extends string> = {
+  itype: 'read',
+  value: V
+}
+type ISeq = {
+  itype: 'seq'
+}
+type IPush<V> = {
+  itype: 'push',
+  value: V
+}
+type IPop = {
+  itype: 'pop'
+}
+type IAbort = {
+  itype: 'abort'
+}
+type IChoose<I extends Insn[]> = {
+  itype: 'choose',
+  insn: I
+}
+type IRep<I extends Insn[]> = {
+  itype: 'rep',
+  insn: I
+}
+type IOpt<V> = {
+  itype: 'opt',
+  value: V
+}
+type IPrepend = {
+  itype: 'prepend'
+}
+type IJoin = {
+  itype: 'join'
+}
+type IRef<K extends string> = {
+  itype: 'ref',
+  ref: K
+}
+type ICall<I extends Insn[]> = {
+  itype: 'call',
+  insn: I
+}
+
+type Insn =
+  IRead<string>
+  | ISeq
+  | IPush<unknown>
+  | IPop
+  | IAbort
+  | IChoose<Insn[]>
+  | IRep<Insn[]>
+  | IOpt<unknown>
+  | IPrepend
+  | IJoin
+  | IRef<string>
+  | ICall<Insn[]>
+  // TODO: IUnknown<T>
+
+type Compile<P extends Parser<unknown>> =
+  Same<Parser<ParseResult<P>>, P> extends true ?
+    [IPush<ParseResult<P>>]
+  : P extends Read<infer V> ? [IRead<V>]
+  : P extends Constant<infer V, infer P1> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+      ?  [ICall<I1>, IAbort, IPop, IPush<V>]
+      : Bug<'Compile:Constant:1'>
+  : P extends Choose<unknown, infer P1, infer P2> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? Compile<P2> extends Match<infer I2, Insn[]>
+      ? [ICall<I1>, IChoose<I2>]
+      : Bug<'Compile:Choose:1'>
+    : Bug<'Compile:Choose:2'>
+  : P extends Seq<unknown, unknown, infer P1, infer P2> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? Compile<P2> extends Match<infer I2, Insn[]>
+      ? [...I1, IAbort, ...I2, ISeq]
+      : Bug<'Compile:Seq:1'>
+    : Bug<'Compile:Seq:2'>
+  : P extends PickFirst<unknown, infer P1, infer P2> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? Compile<P2> extends Match<infer I2, Insn[]>
+      ? [...I1, IAbort, ...I2, IPop]
+      : Bug<'Compile:PickFirst:1'>
+    : Bug<'Compile:PickFirst:2'>
+  : P extends PickSecond<unknown, infer P1, infer P2> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? Compile<P2> extends Match<infer I2, Insn[]>
+      ? [...I1, IAbort, IPop, ...I2]
+      : Bug<'Compile:PickSecond:1'>
+    : Bug<'Compile:PickSecond:2'>
+  : P extends Rep0<unknown, infer P1> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? [IPush<[]>, ICall<I1>, IRep<I1>]
+    : Bug<'Compile:Rep0'>
+  : P extends Opt<unknown, infer P1, infer V> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? [ICall<I1>, IOpt<V>]
+    : Bug<'Compile:Opt'>
+  : P extends Prepend<unknown, unknown[], infer P1, infer P2> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? Compile<P2> extends Match<infer I2, Insn[]>
+      ? [...I1, IAbort, ...I2, IAbort, IPrepend]
+      : Bug<'Compile:Prepend:1'>
+    : Bug<'Compile:Prepend:2'>
+  : P extends Join<string[], infer P1> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? [...I1, IAbort, IJoin]
+    : Bug<'Compile:Join'>
+  : P extends Ref<unknown, infer K> ?
+    [IRef<K>]
+  : Bug<['Compile:Unknown parser', P]>
+
+type State<
+  S extends string,
+  Vs extends unknown[],
+  Is extends Insn[],
+  IStack extends Insn[][],
+  Env extends Record<string, Insn[]>
+> = {
+  s: S,
+  vs: Vs,
+  is: Is,
+  iStack: IStack,
+  env: Env
+}
+type TopState = State<string, unknown[], Insn[], Insn[][], Record<string, Insn[]>>
+type InitialState<
+  S extends string,
+  P extends Parser<unknown>,
+  Env extends Environment
+> =
+  string extends S ? State<string, [P['_result']], [], [], Record<string, Insn[]>>
+  : Compile<P> extends Match<infer Is, Insn[]>
+  ? {[K in keyof Env]: Compile<Env[K]>} extends Match<infer CEnv, Record<string, Insn[]>>
+    ?  State<S, [], Is, [], CEnv>
+    : Bug<'InitialState:1'>
+  : Bug<'InitialState:2'>
+
+type NextState<St extends TopState> =
+  St extends State<
+    infer S,
+    infer Vs,
+    [],
+    [Match<infer Is1, Insn[]>, ...Match<infer Is2, Insn[][]>],
+    infer Env
+  > ?
+    State<S, Vs, Is1, Is2, Env>
+  : St extends State<
+    infer S,
+    infer Vs,
+    [Match<infer I1, Insn>, ...Match<infer I2, Insn[]>],
+    infer IStack,
+    infer Env
+  > ? DoInsn<S, Vs, I1, I2, IStack, Env>
+  : State<'NextState:Bug', [St], [], [], Record<string, Insn[]>>
+
+type DoInsn<
+  S extends string,
+  Vs extends unknown[],
+  I extends Insn,
+  Is extends Insn[],
+  IStack extends Insn[][],
+  Env extends Record<string, Insn[]>
+> =
+  I extends IRead<infer V> ?
+    S extends `${V}${infer Rest}`
+    ? State<Rest, [V, ...Vs], Is, IStack, Env>
+    : State<S, [Fail<['Read', V, S]>, ...Vs], Is, IStack, Env>
+  : I extends ISeq
+    ? Vs extends [infer V1, infer V2, ...infer V3]
+      ? State<S, [[V2, V1], ...V3], Is, IStack, Env>
+      : Bug<['DoInsn:ISeq:Stack inssuficient', Vs]>
+  : I extends IPush<infer V> ?
+    State<S, [V, ...Vs], Is, IStack, Env>
+  : I extends IPop ?
+    Vs extends [infer V1, ...infer V2]
+    ? State<S, V2, Is, IStack, Env>
+    : Bug<'DoInsn:IPop: Value stack is empty'>
+  : I extends IAbort ?
+    Vs extends [Fail<unknown>, ...unknown[]]
+    ? IStack extends [Match<infer Is1, Insn[]>, ...Match<infer Is2, Insn[][]>]
+      ? State<S, Vs, Is1, Is2, Env>
+      : State<S, Vs, [], [], Env>
+    : State<S, Vs, Is, IStack, Env>
+  : I extends IChoose<infer I2> ?
+    Vs extends [Fail<unknown>, ...infer V2]
+    ? State<S, V2, I2, [Is, ...IStack], Env>
+    : State<S, Vs, Is, IStack, Env>
+  : I extends IRep<infer I2> ?
+    Vs extends [Fail<unknown>, ...infer V2]
+    ? State<S, V2, Is, IStack, Env>
+    : Vs extends [infer V1, Match<infer V2, unknown[]>, ...infer V3]
+      ? State<S, [[...V2, V1], ...V3], [ICall<I2>, IRep<I2>, ...Is], IStack, Env>
+      : Bug<['DoInsn:IRep', S, Vs, I, Is, IStack, Env]>
+  : I extends IOpt<infer V1> ?
+    Vs extends [Match<infer F, Fail<unknown>>, ...infer V2]
+    ? State<S, [V1, ...V2], Is, IStack, Env>
+    : State<S, Vs, Is, IStack, Env>
+  : I extends IPrepend ?
+    Vs extends [Match<infer V1, unknown[]>, infer V2, ...infer V3]
+    ? State<S, [[V2, ...V1], ...V3], Is, IStack, Env>
+    : Bug<['DoInsn:Prepend', Vs]>
+  : I extends IJoin ?
+    Vs extends [Match<infer V1, string[]>, ...infer V2]
+    ? State<S, [_Join<V1>, ...V2], Is, IStack, Env>
+    : Bug<['DoInsn:Join', Vs]>
+  : I extends IRef<infer Name> ?
+    State<S, Vs, Env[Name], [Is, ...IStack], Env>
+  : I extends ICall<infer I2> ?
+    State<S, Vs, I2, [Is, ...IStack], Env>
+  : Bug<['DoInsn', I]>
+
+type UnwrapAux<T> =
+  T[] extends never[] ? never
+  : T extends {__rec: {__rec: infer U}} ? {__rec: UnwrapAux<U>}
+  : T extends {__rec: infer U} ? U
+  : T
+type Unwrap<T> =
+  T[] extends {__rec: unknown}[]
+  ? Unwrap<UnwrapAux<T>>
+  : T
+
+type Run<St extends TopState> =
+  St extends State<
+    infer S,
+    [infer V, ...unknown[]],
+    [],
+    [],
+    Record<string, Insn[]>
+  >
+  ? V extends Fail<unknown> ? V : [V, S]
+  : {__rec: Run<NextState<St>>}
+
+export type Environment = Record<string, Parser<unknown>>
+
+export type ParseVM<P extends Parser<unknown>, S extends string, E extends Environment> =
+  string extends S ? [ParseResult<P>, string]
+  : InitialState<S, P, E> extends Match<infer St, TopState>
+  ? Unwrap<Run<St>>
+  : Bug<['ParseVM:1', InitialState<S, P, E>]>
+
 
 export type Parse<P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>> =
   // P is Parser<T> ?
-  P[] extends {_result: infer T}[] ? Same<Parser<T>, P> extends true ? [T, string]
+  P[] extends {_result: infer T}[]
+    ? Same<Parser<T>, P> extends true ? [T, string]
+    // S is string ?
+    : string extends S ? [T, string]
+    : ParseImpl<T, P, S, E>
+  : Bug<'Parse:1'>
 
-  // S is string ?
-  : string extends S ? [T, string]
-
-  : P extends Read<infer T> ?
+type ParseImpl<T, P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>> =
+  P extends Read<infer T> ?
     S extends `${T}${infer Rest}` ? [T, Rest] :
     string extends S ? [T, string] :
     Fail<`${S} is not starts with ${T}`>
@@ -264,13 +515,13 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
   : P extends Constant<infer V, infer P1> ?
     Parse<P1, S, E> extends Fail<infer F> ? Fail<F>
     : Parse<P1, S, E> extends [infer V1, infer S1] ? [V, S1]
-    : Bug<'Constant:1'>
+    : Bug<'ParseImpl:Constant:1'>
 
   : P extends Choose<unknown, infer P1, infer P2> ?
     Parse<P1, S, E> extends Fail<unknown> ?
       Parse<P2, S, E> extends Fail<unknown> ? Fail<`Choose failed at ${S}`>
-      : Parse<P2, S, E> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : Bug<'Choose:1'>
-    : Parse<P1, S, E> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : Bug<'Choose:2'>
+      : Parse<P2, S, E> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : Bug<'ParseImpl:Choose:1'>
+    : Parse<P1, S, E> extends [infer T1, Match<infer S1, string>] ? [T1, S1] : Bug<'ParseImpl:Choose:2'>
 
   : P extends Seq<unknown, unknown, infer P1, infer P2> ?
       Parse<P1, S, E> extends Fail<infer Err> ? Fail<Err> :
@@ -278,8 +529,8 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
         Parse<P2, S1, E> extends Fail<infer Err> ? Fail<Err> :
         Parse<P2, S1, E> extends [infer T2, Match<infer S2, string>] ?
           [[T1, T2], S2]
-          : Bug<'Seq:1'>
-        : Bug<'Seq:2'>
+          : Bug<'ParseImpl:Seq:1'>
+        : Bug<'ParseImpl:Seq:2'>
 
   : P extends PickFirst<unknown, infer P1, infer P2> ?
     Parse<P1, S, E> extends Fail<infer M> ? Fail<M>
@@ -287,8 +538,8 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
       Parse<P2, S1, E> extends Fail<infer M> ? Fail<M>
       : Parse<P2, S1, E> extends [unknown, Match<infer S2, string>] ?
         [T1, S2]
-        : Bug<'PickFirst:1'>
-    : Bug<'PickFirst:2'>
+        : Bug<'ParseImpl:PickFirst:1'>
+    : Bug<'ParseImpl:PickFirst:2'>
 
   : P extends PickSecond<unknown, infer P1, infer P2> ?
     Parse<P1, S, E> extends Fail<infer M> ? Fail<M>
@@ -296,8 +547,8 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
       Parse<P2, S1, E> extends Fail<infer M> ? Fail<M>
       : Parse<P2, S1, E> extends [infer T2, Match<infer S2, string>] ?
         [T2, S2]
-        : Bug<'PickSecond:1'>
-    : Bug<'PickSecond:2'>
+        : Bug<'ParseImpl:PickSecond:1'>
+    : Bug<'ParseImpl:PickSecond:2'>
 
   : P extends Rep0<unknown, infer P1> ?
     Parse<P1, S, E> extends infer R1 ?
@@ -306,13 +557,13 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
         Parse<P, S1, E> extends [Match<infer T2, unknown[]>, Match<infer S2, string>] ?
           [[T1, ...T2], S2]
           : Bug<['Rep0:1', Parse<P, S1, E>]>
-        : Bug<'Rep0:2'>
-    : Bug<'Rep0:3'>
+        : Bug<'ParseImpl:Rep0:2'>
+    : Bug<'ParseImpl:Rep0:3'>
 
   : P extends Opt<unknown, infer P1, infer D> ?
     Parse<P1, S, E> extends Fail<unknown> ? [D, S] :
     Parse<P1, S, E> extends [infer T1, Match<infer S1, string>] ? [T1, S1] :
-    Bug<'Opt:1'>
+    Bug<'ParseImpl:Opt:1'>
 
   : P extends Prepend<unknown, unknown[], infer P1, infer P2> ?
     Parse<P1, S, E> extends infer R1 ?
@@ -322,10 +573,10 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
           R2 extends Fail<infer M> ? Fail<M> :
           R2 extends [Match<infer T2, unknown[]>, Match<infer S2, string>] ?
             [[T1, ...T2], S2]
-            : Bug<'Prepend:1'>
-        : Bug<'Prepend:2'> 
-      : Bug<'Prepend:3'>
-    : Bug<'Prepend:4'>
+            : Bug<'ParseImpl:Prepend:1'>
+        : Bug<'ParseImpl:Prepend:2'>
+      : Bug<'ParseImpl:Prepend:3'>
+    : Bug<'ParseImpl:Prepend:4'>
 
   : P extends Ref<unknown, infer K> ?
     K extends keyof E ?  Parse<E[K], S, E>
@@ -335,83 +586,82 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
     Parse<P1, S, E> extends Fail<infer M> ? Fail<M> :
     Parse<P1, S, E> extends [Match<infer T1, string[]>, Match<infer S1, string>] ?
       [_Join<T1>, S1]
-      : Bug<'Join:1'>
+      : Bug<'ParseImpl:Join:1'>
 
-  : Bug<'Root:1(Unknown parser definition)'>
-  : Bug<'Root:2'>
+  : Bug<'ParseImpl:1(Unknown parser definition)'>
 
 function parse_error(s: string, p: Parser<unknown>): never {
   throw new Error(`Parse error at ${s}, parser=${JSON.stringify(p)}`)
 }
 
 export function parse<P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>>(p: P, s: S, env: E)
-: Parse<P, S, typeof env extends undefined ? Record<string, Parser<unknown>> : E> {
-  const generic_parser: Parser<P['_result']> = p
-  switch(generic_parser.type) {
+: ParseVM<P, S, E>
+export function parse(p: Parser<unknown>, s: string, env: Environment): [unknown, string] {
+  switch(p.type) {
     case 'read': {
-      if(s.startsWith(generic_parser.pattern)) {
-        return [generic_parser.pattern, s.substr(generic_parser.pattern.length)] as any
+      if(s.startsWith(p.pattern)) {
+        return [p.pattern, s.substr(p.pattern.length)] 
       }
       return parse_error(s, p)
     }
     case 'constant': {
-      const [v1, s1] = parse(generic_parser.parser, s, env)
-      return [generic_parser.value, s1] as any
+      const [v1, s1] = parse(p.parser, s, env)
+      return [p.value, s1]
     }
     case 'choose':
       try {
-        return parse(generic_parser.p1, s, env) as any
+        return parse(p.p1, s, env) 
       } catch {
-        return parse(generic_parser.p2, s, env) as any
+        return parse(p.p2, s, env) 
       }
     case 'seq': {
-      const [v1, s1] = parse(generic_parser.p1, s, env)
-      const [v2, s2] = parse(generic_parser.p2, s1, env)
-      return [[v1, v2], s2] as any
+      const [v1, s1] = parse(p.p1, s, env)
+      const [v2, s2] = parse(p.p2, s1, env)
+      return [[v1, v2], s2] 
     }
     case 'pickFirst': {
-      const [v1, s1] = parse(generic_parser.p1, s, env)
+      const [v1, s1] = parse(p.p1, s, env)
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const [v2, s2] = parse(generic_parser.p2, s1, env)
-      return [v1, s2] as any
+      const [v2, s2] = parse(p.p2, s1, env)
+      return [v1, s2] 
     }
     case 'pickSecond': {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const [v1, s1] = parse(generic_parser.p1, s, env)
-      const [v2, s2] = parse(generic_parser.p2, s1, env)
-      return [v2, s2] as any
+      const [v1, s1] = parse(p.p1, s, env)
+      const [v2, s2] = parse(p.p2, s1, env)
+      return [v2, s2] 
     }
     case 'rep0': {
       let v1!: unknown
       let s1!: string
       try {
-        [v1, s1] = parse(generic_parser.p, s, env)
+        [v1, s1] = parse(p.p, s, env)
       } catch {
-        return [[], s] as any
+        return [[], s] 
       }
-      const [v2, s2] = parse(generic_parser, s1, env)
-      return [[v1, ...v2], s2] as any
+      const [v2, s2] = parse(p, s1, env)
+      return [[v1, ...v2], s2] 
     }
     case 'opt': {
       try {
-        return parse(generic_parser.p, s, env) as any
+        return parse(p.p, s, env) 
       } catch {
-        return [generic_parser.default, s] as any
+        return [p.default, s] 
       }
     }
     case 'prepend': {
-      const [v1, s1] = parse(generic_parser.p1, s, env)
-      const [v2, s2] = parse(generic_parser.p2, s1, env)
-      return [[v1, ...v2], s2] as any
+      const [v1, s1] = parse(p.p1, s, env)
+      const [v2, s2] = parse(p.p2, s1, env)
+      return [[v1, ...v2], s2] 
     }
     case 'join': {
-      const [v1, s1] = parse(generic_parser.p, s, env)
-      return [v1.join(''), s1] as any
+      const [v1, s1] = parse(p.p, s, env)
+      return [v1.join(''), s1] 
     }
     case 'ref': {
-      const parser = env[generic_parser.key]
-      if(!parser) throw new Error(`Reference not found: ${generic_parser.key}`)
-      return parse(parser, s, env) as any
+      const parser = env[p.key]
+      if(!parser) throw new Error(`Reference not found: ${p.key}`)
+      return parse(parser, s, env) 
     }
   }
 }

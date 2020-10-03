@@ -24,6 +24,12 @@ function str(s: string): string {
   return s;
 }
 
+type Same<T, U> =
+  (<X>() => X extends T ? 1 : 2) extends (<X>() => X extends U ? 1 : 2)
+  ? void
+  : ["Not same", T, U]
+function tassert<T extends void>(){}
+
 function eq<T>(actual: T, expected: T): void {
   expect(actual).toStrictEqual(expected);
 }
@@ -34,7 +40,8 @@ function ensureFail<T>(x: Fail<T>): void {}
 test("read", () => {
   const parser = read("a");
 
-  const ok1: ["a", "abb"] = parse(parser, "aabb", {});
+  const ok1 = parse(parser, "aabb", {});
+  tassert<Same<typeof ok1, ['a', 'abb']>>()
   eq(ok1, ["a", "abb"]);
 
   expect(() => {
@@ -48,20 +55,25 @@ test("read", () => {
 test("constatnt", () => {
   const parser = read_const("foo", 1 as const);
 
-  const ok1: [1, ""] = parse(parser, "foo", {});
+   const ok1 = parse(parser, "foo", {});
+  tassert<Same<typeof ok1, [1, ""]>>();
   eq(ok1, [1, ""]);
 
-  const ok2: [1, "!!!"] = parse(parser, "foo!!!", {});
+   const ok2 = parse(parser, "foo!!!", {});
+  tassert<Same<typeof ok2, [1, "!!!"]>>();
   eq(ok2, [1, "!!!"]);
 
   const parser2: Parser<1> = read_const("foo", 1);
-  const ok3: [1, string] = parse(parser2, "foo!!!", {});
+   const ok3 = parse(parser2, "foo!!!", {});
+  tassert<Same<typeof ok3, [1, string]>>();
   eq(ok3, [1, "!!!"]);
 
-  const ok4: [1, string] = parse(parser as Parser<1>, "foobar", {});
+   const ok4 = parse(parser as Parser<1>, "foobar", {});
+  tassert<Same<typeof ok4, [1, string]>>();
   eq(ok4, [1, "bar"]);
 
-  const ok5: [unknown, string] = parse(parser as Parser<unknown>, "foobar", {});
+   const ok5 = parse(parser as Parser<unknown>, "foobar", {});
+  tassert<Same<typeof ok5, [unknown, string]>>();
   eq(ok5, [1, "bar"]);
 
   expect(() => {
@@ -75,10 +87,12 @@ test("choose", () => {
     read_const("bar", [2] as const)
   );
 
-  const ok1: [1, ""] = parse(parser, "foo", {});
+   const ok1 = parse(parser, "foo", {});
+  tassert<Same<typeof ok1, [1, ""]>>();
   eq(ok1, [1, ""]);
 
-  const ok2: [readonly [2], ""] = parse(parser, "bar", {});
+   const ok2 = parse(parser, "bar", {});
+  tassert<Same<typeof ok2, [readonly [2], ""]>>();
   eq(ok2, [[2], ""]);
 
   expect(() => {
@@ -89,16 +103,20 @@ test("choose", () => {
 test("seq", () => {
   const parser = seq(read_const("foo", 1 as const), read_const("bar", 2 as const));
 
-  const ok1: [[1, 2], ""] = parse(parser, "foobar", {});
+   const ok1 = parse(parser, "foobar", {});
+  tassert<Same<typeof ok1, [[1, 2], ""]>>();
   eq(ok1, [[1, 2], ""]);
 
-  const ok2: [[1, 2], "abc"] = parse(parser, "foobarabc", {});
+   const ok2 = parse(parser, "foobarabc", {});
+  tassert<Same<typeof ok2, [[1, 2], "abc"]>>();
   eq(ok2, [[1, 2], "abc"]);
 
-  const ok3: [[1, 2], string] = parse(parser, str("foobarabc"), {});
+   const ok3 = parse(parser, str("foobarabc"), {});
+  tassert<Same<typeof ok3, [[1, 2], string]>>();
   eq(ok3, [[1, 2], "abc"]);
 
-  const ok4: [[1, 2], string] = parse(parser as Parser<[1, 2]>, "foobar", {});
+   const ok4 = parse(parser as Parser<[1, 2]>, "foobar", {});
+  tassert<Same<typeof ok4, [[1, 2], string]>>();
   eq(ok4, [[1, 2], ""]);
 
   expect(() => {
@@ -112,16 +130,20 @@ test("pickFirst", () => {
     read_const("bar", 2 as const)
   );
 
-  const ok1: [1, ""] = parse(parser, "foobar", {});
+   const ok1 = parse(parser, "foobar", {});
+  tassert<Same<typeof ok1, [1, ""]>>();
   eq(ok1, [1, ""]);
 
-  const ok2: [1, "x"] = parse(parser, "foobarx", {});
+   const ok2 = parse(parser, "foobarx", {});
+  tassert<Same<typeof ok2, [1, "x"]>>();
   eq(ok2, [1, "x"]);
 
-  const ok3: [1, string] = parse(parser, str("foobarx"), {});
+   const ok3 = parse(parser, str("foobarx"), {});
+  tassert<Same<typeof ok3, [1, string]>>();
   eq(ok3, [1, "x"]);
 
-  const ok4: [1, string] = parse(parser as Parser<1>, "foobar", {});
+   const ok4 = parse(parser as Parser<1>, "foobar", {});
+  tassert<Same<typeof ok4, [1, string]>>();
   eq(ok4, [1, ""]);
 
   expect(() => {
@@ -138,16 +160,20 @@ test("pickSecond", () => {
     read_const("bar", 2 as const)
   );
 
-  const ok1: [2, ""] = parse(parser, "foobar", {});
+   const ok1 = parse(parser, "foobar", {});
+  tassert<Same<typeof ok1, [2, ""]>>();
   eq(ok1, [2, ""]);
 
-  const ok2: [2, "x"] = parse(parser, "foobarx", {});
+   const ok2 = parse(parser, "foobarx", {});
+  tassert<Same<typeof ok2, [2, "x"]>>();
   eq(ok2, [2, "x"]);
 
-  const ok3: [2, string] = parse(parser, str("foobarx"), {});
+   const ok3 = parse(parser, str("foobarx"), {});
+  tassert<Same<typeof ok3, [2, string]>>();
   eq(ok3, [2, "x"]);
 
-  const ok4: [2, string] = parse(parser as Parser<2>, "foobar", {});
+   const ok4 = parse(parser as Parser<2>, "foobar", {});
+  tassert<Same<typeof ok4, [2, string]>>();
   eq(ok4, [2, ""]);
 
   expect(() => {
@@ -161,19 +187,24 @@ test("pickSecond", () => {
 test("rep0", () => {
   const parser = rep0(read_const("x", 1 as const));
 
-  const ok1: [[], ""] = parse(parser, "", {});
+   const ok1 = parse(parser, "", {});
+  tassert<Same<typeof ok1, [[], ""]>>();
   eq(ok1, [[], ""]);
 
-  const ok2: [[], "a"] = parse(parser, "a", {});
+   const ok2 = parse(parser, "a", {});
+  tassert<Same<typeof ok2, [[], "a"]>>();
   eq(ok2, [[], "a"]);
 
-  const ok3: [[1], ""] = parse(parser, "x", {});
+   const ok3 = parse(parser, "x", {});
+  tassert<Same<typeof ok3, [[1], ""]>>();
   eq(ok3, [[1], ""]);
 
-  const ok4: [[1, 1], ""] = parse(parser, "xx", {});
+   const ok4 = parse(parser, "xx", {});
+  tassert<Same<typeof ok4, [[1, 1], ""]>>();
   eq(ok4, [[1, 1], ""]);
 
-  const ok5: [[1, 1], "a"] = parse(parser, "xxa", {});
+   const ok5 = parse(parser, "xxa", {});
+  tassert<Same<typeof ok5, [[1, 1], "a"]>>();
   eq(ok5, [[1, 1], "a"]);
 });
 
@@ -183,13 +214,16 @@ test("prepend", () => {
     rep0(read_const("y", 2 as const))
   );
 
-  const ok1: [[1], ""] = parse(parser, "x", {});
+   const ok1 = parse(parser, "x", {});
+  tassert<Same<typeof ok1, [[1], ""]>>();
   eq(ok1, [[1], ""]);
 
-  const ok2: [[1, 2], ""] = parse(parser, "xy", {});
+   const ok2 = parse(parser, "xy", {});
+  tassert<Same<typeof ok2, [[1, 2], ""]>>();
   eq(ok2, [[1, 2], ""]);
 
-  const ok3: [[1, 2, 2], "a"] = parse(parser, "xyya", {});
+   const ok3 = parse(parser, "xyya", {});
+  tassert<Same<typeof ok3, [[1, 2, 2], "a"]>>();
   eq(ok3, [[1, 2, 2], "a"]);
 
   expect(() => {
@@ -200,9 +234,11 @@ test("prepend", () => {
 test("rep1", () => {
   const parser = rep1(read_const("x", 1 as const));
 
-  const ok1: [[1], ""] = parse(parser, "x", {});
+   const ok1 = parse(parser, "x", {});
+  tassert<Same<typeof ok1, [[1], ""]>>();
   eq(ok1, [[1], ""]);
-  const ok2: [[1, 1], "a"] = parse(parser, "xxa", {});
+   const ok2 = parse(parser, "xxa", {});
+  tassert<Same<typeof ok2, [[1, 1], "a"]>>();
   eq(ok2, [[1, 1], "a"]);
 
   expect(() => {
@@ -210,33 +246,53 @@ test("rep1", () => {
   }).toThrow();
 });
 
+test("rep1 rec limit", () => {
+  const parser = rep1(read_const("x", 1 as const))
+
+  const ok1: [
+    [
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, // x10
+    ], ""
+  ] = parse(
+    parser,
+    'xxxxxxxxxx', // x10
+    {}
+  )
+})
+
 test("join", () => {
   const parser = join(rep0(read_const("x", "y" as const)));
 
-  const ok1: ["", "a"] = parse(parser, "a", {});
+   const ok1 = parse(parser, "a", {});
+  tassert<Same<typeof ok1, ["", "a"]>>();
   eq(ok1, ["", "a"]);
 
-  const ok2: ["yyy", ""] = parse(parser, "xxx", {});
+   const ok2 = parse(parser, "xxx", {});
+  tassert<Same<typeof ok2, ["yyy", ""]>>();
   eq(ok2, ["yyy", ""]);
 });
 
 test("wrap", () => {
   const parser = wrap(read("("), rep0(read("a")), read(")"));
 
-  const ok1: [[], ""] = parse(parser, "()", {});
+   const ok1 = parse(parser, "()", {});
+  tassert<Same<typeof ok1, [[], ""]>>();
   eq(ok1, [[], ""]);
 
-  const ok2: [["a", "a"], ""] = parse(parser, "(aa)", {});
+   const ok2 = parse(parser, "(aa)", {});
+  tassert<Same<typeof ok2, [["a", "a"], ""]>>();
   eq(ok2, [["a", "a"], ""]);
 });
 
 test("rep1sep", () => {
   const parser = rep1sep(read("a"), read(","));
 
-  const ok1: [["a"], ""] = parse(parser, "a", {});
+   const ok1 = parse(parser, "a", {});
+  tassert<Same<typeof ok1, [["a"], ""]>>();
   eq(ok1, [["a"], ""]);
 
-  const ok2: [["a", "a"], "x"] = parse(parser, "a,ax", {});
+   const ok2 = parse(parser, "a,ax", {});
+  tassert<Same<typeof ok2, [["a", "a"], "x"]>>();
   eq(ok2, [["a", "a"], "x"]);
 
   expect(() => {
@@ -247,23 +303,28 @@ test("rep1sep", () => {
 test("opt", () => {
   const parser = opt(read("a"), null);
 
-  const ok1: ["a", "b"] = parse(parser, "ab", {});
+   const ok1 = parse(parser, "ab", {});
+  tassert<Same<typeof ok1, ["a", "b"]>>();
   eq(ok1, ["a", "b"]);
 
-  const ok2: [null, "b"] = parse(parser, "b", {});
+   const ok2 = parse(parser, "b", {});
+  tassert<Same<typeof ok2, [null, "b"]>>();
   eq(ok2, [null, "b"]);
 });
 
 test("rep0sep", () => {
   const parser = rep0sep(read("a"), read(","));
 
-  const ok1: [["a"], ""] = parse(parser, "a", {});
+   const ok1 = parse(parser, "a", {});
+  tassert<Same<typeof ok1, [["a"], ""]>>();
   eq(ok1, [["a"], ""]);
 
-  const ok2: [["a", "a"], "x"] = parse(parser, "a,ax", {});
+   const ok2 = parse(parser, "a,ax", {});
+  tassert<Same<typeof ok2, [["a", "a"], "x"]>>();
   eq(ok2, [["a", "a"], "x"]);
 
-  const ok3: [[], "x"] = parse(parser, "x", {});
+   const ok3 = parse(parser, "x", {});
+  tassert<Same<typeof ok3, [[], "x"]>>();
   eq(ok3, [[], "x"]);
 });
 
@@ -275,7 +336,8 @@ test("ref", () => {
     one: one,
     two: two
   }
-  const ok1: ['a', ''] = parse(parser, 'a', env)
+   const ok1 = parse(parser, 'a', env)
+  tassert<Same<typeof ok1, ['a', '']>>();
 })
 
 test("complex: expr", () => {
@@ -292,18 +354,24 @@ test("complex: expr", () => {
   const expr = choose(name, tuple);
   const env = { expr: expr } as const;
 
-  const ok1: [[], ""] = parse(expr, "()", env);
+   const ok1 = parse(expr, "()", env);
+  tassert<Same<typeof ok1, [[], ""]>>();
   eq(ok1, [[], ""]);
 
-  const ok2: ["aaa", ""] = parse(expr, "aaa", env);
+   const ok2 = parse(expr, "aaa", env);
+  tassert<Same<typeof ok2, ["aaa", ""]>>();
   eq(ok2, ["aaa", ""]);
 
-  const ok3: [["a"], ""] = parse(expr, "(a)", env);
+   const ok3 = parse(expr, "(a)", env);
+  tassert<Same<typeof ok3, [["a"], ""]>>();
   eq(ok3, [["a"], ""]);
 
-  // FIXME: TS2589
-  // const ok4: [['a', 'a'], ''] = parse(expr, '(a,a)', env)
-  // eq(ok4, [['a', 'a'], ''])
-  // const ok5: [[[]], ''] = parse(expr, '(())', env)
-  // eq(ok5, [[[]], ''])
+   const ok4 = parse(expr, '(a,a)', env)
+  tassert<Same<typeof ok4, [['a', 'a'], '']>>();
+  eq(ok4, [['a', 'a'], ''])
+   const ok5 = parse(expr, '(())', env)
+  tassert<Same<typeof ok5, [[[]], '']>>();
+  eq(ok5, [[[]], ''])
+   const ok6 = parse(expr, '((a),(a,a,(a)))', env)
+  tassert<Same<typeof ok6, [[['a'], ['a', 'a', ['a']]], '']>>();
 });
