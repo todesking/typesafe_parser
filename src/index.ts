@@ -333,11 +333,11 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
   : Bug<'Root:1(Unknown parser definition)'>
   : Bug<'Root:2'>
 
-function parse_error(s: string): never {
-  throw `Parse error at ${s}`
+function parse_error(s: string, p: Parser<unknown>): never {
+  throw new Error(`Parse error at ${s}, parser=${JSON.stringify(p)}`)
 }
 
-export function parse<P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>>(p: P, s: S, env?: E)
+export function parse<P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>>(p: P, s: S, env: E)
 : Parse<P, S, typeof env extends undefined ? Record<string, Parser<unknown>> : E> {
   const generic_parser: Parser<P['_result']> = p
   switch(generic_parser.type) {
@@ -345,68 +345,67 @@ export function parse<P extends Parser<unknown>, S extends string, E extends Rec
       if(s.startsWith(generic_parser.pattern)) {
         return [generic_parser.pattern, s.substr(generic_parser.pattern.length)] as any
       }
-      return parse_error(s)
+      return parse_error(s, p)
     }
     case 'constant':
       if(s.startsWith(generic_parser.pattern)) {
         return [generic_parser.value, s.substr(generic_parser.pattern.length)] as any
       }
-      return parse_error(s)
+      return parse_error(s, p)
     case 'choose':
       try {
-        return parse(generic_parser.p1, s) as any
+        return parse(generic_parser.p1, s, env) as any
       } catch {
-        return parse(generic_parser.p2, s) as any
+        return parse(generic_parser.p2, s, env) as any
       }
     case 'seq': {
-      const [v1, s1] = parse(generic_parser.p1, s)
-      const [v2, s2] = parse(generic_parser.p2, s1)
+      const [v1, s1] = parse(generic_parser.p1, s, env)
+      const [v2, s2] = parse(generic_parser.p2, s1, env)
       return [[v1, v2], s2] as any
     }
     case 'pickFirst': {
-      const [v1, s1] = parse(generic_parser.p1, s)
+      const [v1, s1] = parse(generic_parser.p1, s, env)
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const [v2, s2] = parse(generic_parser.p2, s1)
+      const [v2, s2] = parse(generic_parser.p2, s1, env)
       return [v1, s2] as any
     }
     case 'pickSecond': {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const [v1, s1] = parse(generic_parser.p1, s)
-      const [v2, s2] = parse(generic_parser.p2, s1)
+      const [v1, s1] = parse(generic_parser.p1, s, env)
+      const [v2, s2] = parse(generic_parser.p2, s1, env)
       return [v2, s2] as any
     }
     case 'rep0': {
       let v1!: unknown
       let s1!: string
       try {
-        [v1, s1] = parse(generic_parser.p, s)
+        [v1, s1] = parse(generic_parser.p, s, env)
       } catch {
         return [[], s] as any
       }
-      const [v2, s2] = parse(generic_parser, s1)
+      const [v2, s2] = parse(generic_parser, s1, env)
       return [[v1, ...v2], s2] as any
     }
     case 'opt': {
       try {
-        return parse(generic_parser.p, s) as any
+        return parse(generic_parser.p, s, env) as any
       } catch {
         return [generic_parser.default, s] as any
       }
     }
     case 'prepend': {
-      const [v1, s1] = parse(generic_parser.p1, s)
-      const [v2, s2] = parse(generic_parser.p2, s1)
+      const [v1, s1] = parse(generic_parser.p1, s, env)
+      const [v2, s2] = parse(generic_parser.p2, s1, env)
       return [[v1, ...v2], s2] as any
     }
     case 'join': {
-      const [v1, s1] = parse(generic_parser.p, s)
+      const [v1, s1] = parse(generic_parser.p, s, env)
       return [v1.join(''), s1] as any
     }
     case 'ref': {
-      if(!env) throw `Reference not found: ${generic_parser.key}`
-      const parser = (env || {})[generic_parser.key]
-      if(!parser) throw `Reference not found: ${generic_parser.key}`
-      return parse(parser, s) as any
+      const parser = env[generic_parser.key]
+      if(!parser) throw new Error(`Reference not found: ${generic_parser.key}`)
+      return parse(parser, s, env) as any
     }
   }
 }
