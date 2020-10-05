@@ -14,20 +14,25 @@ export function read<P extends string>(p: P): Read<P> {
   }
 }
 
-export type Constant<T, P extends string> = {
+export type Constant<T, P extends Parser<unknown>> = {
   type: 'constant',
-  pattern: P,
+  parser: P,
   value: T,
   _result: T
 }
 
-export function constant<P extends string, T>(p: P, v: T): Constant<T, P> {
+export function constant<P extends Parser<unknown>, T>(p: P, v: T): Constant<T, P> {
   return {
     type: 'constant',
-    pattern: p,
+    parser: p,
     value: v,
     _result: resultTag
   }
+}
+
+export function read_const<P extends string, V>(p: P, v: V)
+: Constant<V, Read<P>> {
+  return constant(read(p), v)
 }
 
 export type Choose<T, P1 extends Parser<T>, P2 extends Parser<T>> = {
@@ -207,7 +212,7 @@ export function ref<T>(): <K extends string>(key: K) => Ref<T, K> {
 
 export type Parser<T> =
   (Read<string> & {_result: T})
-  | Constant<T, string>
+  | ConstantRec<T>
   | ChooseRec<T>
   | (SeqRec & {_result: T})
   | PickFirstRec<T>
@@ -218,6 +223,7 @@ export type Parser<T> =
   | (OptRec & {_result: T})
   | Ref<T, string>
 
+interface ConstantRec<T> extends Constant<T, Parser<unknown>> {}
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
 interface PickFirstRec<T> extends PickFirst<T, Parser<T>, Parser<unknown>> {}
@@ -255,9 +261,10 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
     string extends S ? [T, string] :
     Fail<`${S} is not starts with ${T}`>
 
-  : P extends Constant<unknown, infer P> ?
-    S extends `${P}${infer Rest}` ? [T, Rest] :
-    string extends S ? [T, string] : Fail<`${S} is not starts with ${P}`>
+  : P extends Constant<infer V, infer P1> ?
+    Parse<P1, S, E> extends Fail<infer F> ? Fail<F>
+    : Parse<P1, S, E> extends [infer V1, infer S1] ? [V, S1]
+    : Bug<'Constant:1'>
 
   : P extends Choose<unknown, infer P1, infer P2> ?
     Parse<P1, S, E> extends Fail<unknown> ?
@@ -347,11 +354,10 @@ export function parse<P extends Parser<unknown>, S extends string, E extends Rec
       }
       return parse_error(s, p)
     }
-    case 'constant':
-      if(s.startsWith(generic_parser.pattern)) {
-        return [generic_parser.value, s.substr(generic_parser.pattern.length)] as any
-      }
-      return parse_error(s, p)
+    case 'constant': {
+      const [v1, s1] = parse(generic_parser.parser, s, env)
+      return [generic_parser.value, s1] as any
+    }
     case 'choose':
       try {
         return parse(generic_parser.p1, s, env) as any

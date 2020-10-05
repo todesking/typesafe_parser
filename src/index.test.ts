@@ -12,6 +12,7 @@ import {
   Fail,
   join,
   read,
+  read_const,
   wrap,
   rep1sep,
   rep0sep,
@@ -45,7 +46,7 @@ test("read", () => {
 });
 
 test("constatnt", () => {
-  const parser = constant("foo", 1 as const);
+  const parser = read_const("foo", 1 as const);
 
   const ok1: [1, ""] = parse(parser, "foo", {});
   eq(ok1, [1, ""]);
@@ -53,7 +54,7 @@ test("constatnt", () => {
   const ok2: [1, "!!!"] = parse(parser, "foo!!!", {});
   eq(ok2, [1, "!!!"]);
 
-  const parser2: Parser<1> = constant("foo", 1);
+  const parser2: Parser<1> = read_const("foo", 1);
   const ok3: [1, string] = parse(parser2, "foo!!!", {});
   eq(ok3, [1, "!!!"]);
 
@@ -70,8 +71,8 @@ test("constatnt", () => {
 
 test("choose", () => {
   const parser = choose(
-    constant("foo", 1 as const),
-    constant("bar", [2] as const)
+    read_const("foo", 1 as const),
+    read_const("bar", [2] as const)
   );
 
   const ok1: [1, ""] = parse(parser, "foo", {});
@@ -86,7 +87,7 @@ test("choose", () => {
 });
 
 test("seq", () => {
-  const parser = seq(constant("foo", 1 as const), constant("bar", 2 as const));
+  const parser = seq(read_const("foo", 1 as const), read_const("bar", 2 as const));
 
   const ok1: [[1, 2], ""] = parse(parser, "foobar", {});
   eq(ok1, [[1, 2], ""]);
@@ -107,8 +108,8 @@ test("seq", () => {
 
 test("pickFirst", () => {
   const parser = pickFirst(
-    constant("foo", 1 as const),
-    constant("bar", 2 as const)
+    read_const("foo", 1 as const),
+    read_const("bar", 2 as const)
   );
 
   const ok1: [1, ""] = parse(parser, "foobar", {});
@@ -133,8 +134,8 @@ test("pickFirst", () => {
 
 test("pickSecond", () => {
   const parser = pickSecond(
-    constant("foo", 1 as const),
-    constant("bar", 2 as const)
+    read_const("foo", 1 as const),
+    read_const("bar", 2 as const)
   );
 
   const ok1: [2, ""] = parse(parser, "foobar", {});
@@ -158,7 +159,7 @@ test("pickSecond", () => {
 });
 
 test("rep0", () => {
-  const parser = rep0(constant("x", 1 as const));
+  const parser = rep0(read_const("x", 1 as const));
 
   const ok1: [[], ""] = parse(parser, "", {});
   eq(ok1, [[], ""]);
@@ -178,8 +179,8 @@ test("rep0", () => {
 
 test("prepend", () => {
   const parser = prepend(
-    constant("x", 1 as const),
-    rep0(constant("y", 2 as const))
+    read_const("x", 1 as const),
+    rep0(read_const("y", 2 as const))
   );
 
   const ok1: [[1], ""] = parse(parser, "x", {});
@@ -197,7 +198,7 @@ test("prepend", () => {
 });
 
 test("rep1", () => {
-  const parser = rep1(constant("x", 1 as const));
+  const parser = rep1(read_const("x", 1 as const));
 
   const ok1: [[1], ""] = parse(parser, "x", {});
   eq(ok1, [[1], ""]);
@@ -210,7 +211,7 @@ test("rep1", () => {
 });
 
 test("join", () => {
-  const parser = join(rep0(constant("x", "y" as const)));
+  const parser = join(rep0(read_const("x", "y" as const)));
 
   const ok1: ["", "a"] = parse(parser, "a", {});
   eq(ok1, ["", "a"]);
