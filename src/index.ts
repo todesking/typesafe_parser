@@ -283,13 +283,15 @@ export type Fail<Msg> = { fail: Msg };
 
 type Bug<Msg> = { bug: Msg };
 
-type _Join<T extends string[]> = string[] extends T
-  ? string
-  : T extends []
-  ? ""
+// prettier-ignore
+type _Join<T extends string[]> =
+  string[] extends T ? string
+  : _Join1<T, ''>
+type _Join1<T extends string[], R extends string> =
+  T extends [] ? R
   : T extends [Match<infer T1, string>, ...Match<infer T2, string[]>]
-  ? `${T1}${_Join<T2>}`
-  : never;
+    ? _Join1<T2, `${R}${T1}`>
+    : never;
 
 // https://github.com/microsoft/TypeScript/issues/27024#issuecomment-421529650
 type Same<T, U> = (<X>() => X extends T ? 1 : 2) extends <X>() => X extends U
