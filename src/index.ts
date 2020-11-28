@@ -2,15 +2,15 @@ const resultTag: any = null
 
 export type Read<P extends string> = {
   type: 'read',
-  pattern: P,
-  _result: P
+  pattern: P[],
+  _result: P[number]
 }
 
-export function read<P extends string>(p: P): Read<P> {
+export function read<P extends string[]>(...p: P): Read<P[number]> {
   return {
     type: 'read',
     pattern: p,
-    _result: p
+    _result: resultTag
   }
 }
 
@@ -313,7 +313,7 @@ type Insn =
   | ICall<Insn[]>
   // TODO: IUnknown<T>
 
-type Compile<P extends Parser<unknown>> =
+export type Compile<P extends Parser<unknown>> =
   Same<Parser<ParseResult<P>>, P> extends true ?
     [IPush<ParseResult<P>>]
   : P extends Read<infer V> ? [IRead<V>]
@@ -391,7 +391,7 @@ type InitialState<
   ? {[K in keyof Env]: Compile<Env[K]>} extends Match<infer CEnv, Record<string, Insn[]>>
     ?  State<S, [], Is, [], CEnv>
     : Bug<'InitialState:1'>
-  : Bug<'InitialState:2'>
+  : Bug<['InitialState:2', Compile<P>]>
 
 type NextState<St extends TopState> =
   St extends State<
@@ -411,6 +411,16 @@ type NextState<St extends TopState> =
   > ? DoInsn<S, Vs, I1, I2, IStack, Env>
   : State<'NextState:Bug', [St], [], [], Record<string, Insn[]>>
 
+type DoRead<V extends string, S extends string> =
+  V extends Match<infer V1, string>
+  ? S extends `${V1}${infer Rest}`
+    ? [V1, Rest]
+    : never
+  : Bug<'DoRead:1'>
+
+type X2 = DoRead<'a' | 'b', 'ax'>
+type X1 = DoInsn<'ax', [], IRead<'a' | 'b'>, [], [], {}>
+
 type DoInsn<
   S extends string,
   Vs extends unknown[],
@@ -420,9 +430,11 @@ type DoInsn<
   Env extends Record<string, Insn[]>
 > =
   I extends IRead<infer V> ?
-    S extends `${V}${infer Rest}`
-    ? State<Rest, [V, ...Vs], Is, IStack, Env>
-    : State<S, [Fail<['Read', V, S]>, ...Vs], Is, IStack, Env>
+    DoRead<V, S> extends never
+      ? State<S, [Fail<['Read', V, S]>, ...Vs], Is, IStack, Env>
+      : DoRead<V, S> extends [infer V1, Match<infer S1, string>]
+        ? State<S1, [V1, ...Vs], Is, IStack, Env>
+        : Bug<'Read:1'>
   : I extends ISeq
     ? Vs extends [infer V1, infer V2, ...infer V3]
       ? State<S, [[V2, V1], ...V3], Is, IStack, Env>
@@ -497,6 +509,7 @@ export type ParseVM<P extends Parser<unknown>, S extends string, E extends Envir
   : Bug<['ParseVM:1', InitialState<S, P, E>]>
 
 
+/*
 export type Parse<P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>> =
   // P is Parser<T> ?
   P[] extends {_result: infer T}[]
@@ -505,7 +518,8 @@ export type Parse<P extends Parser<unknown>, S extends string, E extends Record<
     : string extends S ? [T, string]
     : ParseImpl<T, P, S, E>
   : Bug<'Parse:1'>
-
+*/
+/*
 type ParseImpl<T, P extends Parser<unknown>, S extends string, E extends Record<string, Parser<unknown>>> =
   P extends Read<infer T> ?
     S extends `${T}${infer Rest}` ? [T, Rest] :
@@ -589,6 +603,7 @@ type ParseImpl<T, P extends Parser<unknown>, S extends string, E extends Record<
       : Bug<'ParseImpl:Join:1'>
 
   : Bug<'ParseImpl:1(Unknown parser definition)'>
+*/
 
 function parse_error(s: string, p: Parser<unknown>): never {
   throw new Error(`Parse error at ${s}, parser=${JSON.stringify(p)}`)
@@ -599,8 +614,10 @@ export function parse<P extends Parser<unknown>, S extends string, E extends Rec
 export function parse(p: Parser<unknown>, s: string, env: Environment): [unknown, string] {
   switch(p.type) {
     case 'read': {
-      if(s.startsWith(p.pattern)) {
-        return [p.pattern, s.substr(p.pattern.length)] 
+      for(const pat of p.pattern) {
+        if(s.startsWith(pat)) {
+          return [pat, s.substr(pat.length)] 
+        }
       }
       return parse_error(s, p)
     }

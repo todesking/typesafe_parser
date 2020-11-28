@@ -18,6 +18,7 @@ import {
   rep0sep,
   opt,
   ref,
+  Compile,
 } from "./";
 
 function str(s: string): string {
@@ -356,7 +357,22 @@ test("ref", () => {
   };
   const ok1 = parse(parser, "a", env);
   tassert<Same<typeof ok1, ["a", ""]>>();
+  eq(ok1, ['a', ''])
 });
+
+test("complex: name", () => {
+  const alpha = read(
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n',
+    'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
+  )
+  const name = join(rep1(alpha))
+  type X1 = Compile<typeof name>
+  
+  const ok1 = parse(name, 'abcdefghijklmn', {})
+  const ex1 = ['abc', ''] as const
+  tassert<Same<typeof ok1, typeof ex1>>()
+  eq(ok1, ex1)
+})
 
 test("complex: expr", () => {
   // expr := name | tuple
@@ -365,7 +381,7 @@ test("complex: expr", () => {
   type Name = string;
   type Tuple = Expr[];
   type Expr = Name | Tuple;
-
+  
   const exprRef = ref<Expr>()("expr");
   const name = join(rep1(read("a")));
   const tuple = wrap(read("("), rep0sep(exprRef, read(",")), read(")"));
@@ -393,3 +409,4 @@ test("complex: expr", () => {
   const ok6 = parse(expr, "((a),(a,a,(a)))", env);
   tassert<Same<typeof ok6, [[["a"], ["a", "a", ["a"]]], ""]>>();
 });
+
