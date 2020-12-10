@@ -485,3 +485,48 @@ test("complex: expr", () => {
   tassert<Same<typeof ok5, [[["1"], ["2", [["3"], ["4"]]]], ""]>>();
   eq(ok5, [[["1"], ["2", [["3"], ["4"]]]], ""]);
 });
+
+test("complex: json", () => {
+  // json = array | dict | num | str
+  // array = '[]' | '[' json (',' json)* ']'
+  // dict = '{}' | '{' str ':' json (',' dict_key ':' json)* '}'
+  // num = [0-9]+
+  // str = '"' ([^"] | '//"')* '"'
+  const self_ref = ref<unknown>()('json')
+  const str_body = join(rep0(choose(read('\\"'), not(read('"'), anyChar()))))
+  const str = wrap(read('"'), str_body, read('"'))
+  const num = join(rep1(number))
+  const array = wrap(read('['), rep0sep(self_ref, read(',')), read(']'))
+  const dict_kv = seq(str, pickSecond(read(':'), self_ref))
+  const dict = wrap(read('{'), rep0sep(dict_kv, read(',')), read('}'))
+  const json = choose(dict, choose(array, choose(num, str)))
+  const env = {json}
+
+  const ok1 = parse(json, '1', env)
+  tassert<Same<typeof ok1, ['1', '']>>()
+  eq(ok1, ['1', ''])
+
+  const ok2 = parse(json, '"abc"', env)
+  tassert<Same<typeof ok2, ['abc', '']>>()
+  eq(ok2, ['abc', ''])
+
+  const ok3 = parse(json, '"abc\\""', env)
+  tassert<Same<typeof ok3, ['abc\\"', '']>>()
+  eq(ok3, ['abc\\"', ''])
+
+  const ok5 = parse(json, '[1,2]', env)
+  tassert<Same<typeof ok5, [['1', '2'], '']>>()
+  eq(ok5, [['1', '2'], ''])
+
+  const ok6 = parse(json, '{}', env)
+  tassert<Same<typeof ok6, [[], '']>>()
+  eq(ok6, [[], ''])
+
+  const ok7 = parse(json, '{"key1":1,"key2":"abc"}', env)
+  tassert<Same<typeof ok7, [[['key1', '1'], ['key2', 'abc']], '']>>()
+  eq(ok7, [[['key1', '1'], ['key2', 'abc']], ''])
+
+  const content8 = '{"num":123,"str":"abc","arr":[1,"a",[]],"dict":{"k1":1}}'
+  const ok8 = parse(json, content8, env)
+  tassert<Same<typeof ok8, [[['num', '123'], ['str', 'abc'], ['arr', ['1', 'a', []]], ['dict', [['k1', '1']]]], '']>>()
+});

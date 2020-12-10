@@ -561,7 +561,10 @@ type InitialState<
     : Bug<"InitialState:1">
   : Bug<["InitialState:2", Compile<P>]>;
 
-type NextState<St extends TopState> = St extends State<
+type NextState<St extends TopState> =
+  St extends State<string, unknown[], [], [], Record<string, Insn[]>>
+  ? St
+  : St extends State<
   infer S,
   infer Vs,
   [],
@@ -578,6 +581,14 @@ type NextState<St extends TopState> = St extends State<
     >
   ? DoInsn<S, Vs, I1, I2, IStack, Env>
   : State<"NextState:Bug", [St], [], [], Record<string, Insn[]>>;
+
+// prettier-ignore
+type FutureState<St extends TopState> =
+  NextState<NextState<NextState<NextState<NextState<
+  NextState<NextState<NextState<NextState<NextState<
+    St
+  >>>>>
+  >>>>>
 
 type DoRead<V extends string, S extends string> = V extends Match<
   infer V1,
@@ -614,7 +625,7 @@ type DoInsn<
   : I extends INot ? 
     Vs extends [Fail<unknown>, Match<infer S1, string>, ...infer Vs2]
     ? State<S1, Vs2, Is, IStack, Env>
-    : Vs extends [unknown, ...infer Vs2]
+    : Vs extends [unknown, unknown, ...infer Vs2]
       ? State<S, [Fail<"Not">, ...Vs2], Is, IStack, Env>
       : Bug<'INot'>
   : I extends IPush<infer V> ?
@@ -674,7 +685,7 @@ type Run<St extends TopState> =
   ? V extends Fail<unknown>
     ? V
     : [V, S]
-  : { __rec: Run<NextState<St>> };
+  : { __rec: Run<FutureState<St>> };
 
 export type Environment = Record<string, Parser<unknown>>;
 
