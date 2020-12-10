@@ -1,7 +1,5 @@
 import {
-  Parser,
   parse,
-  constant,
   choose,
   seq,
   pickFirst,
@@ -20,6 +18,9 @@ import {
   ref,
   small_alpha,
   capital_alpha,
+  nonzero_number,
+  number,
+  pickSecondOf3,
   Compile,
 } from "./";
 
@@ -32,6 +33,8 @@ type Same<T, U> = (<X>() => X extends T ? 1 : 2) extends <X>() => X extends U
   : 2
   ? void
   : ["Not same", T, U];
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function tassert<T extends void>() {}
 
 function eq<T>(actual: T, expected: T): void {
@@ -416,4 +419,37 @@ test("complex: nested", () => {
   eq(ok5, [[[]], ""]);
   const ok6 = parse(expr, "((a),(a,a,(a)))", env);
   tassert<Same<typeof ok6, [[["a"], ["a", "a", ["a"]]], ""]>>();
+});
+
+test("complex: expr", () => {
+  // expr := expr1 (+ expr1)*
+  // expr1 := expr2 (* expr2)*
+  // expr2 = num | '(' expr ')'
+  const exprRef = ref<unknown>()("expr");
+  const num = join(prepend(nonzero_number, rep0(number)));
+  const paren = pickSecondOf3(read("("), exprRef, read(")"));
+  const expr2 = choose(num, paren);
+  const expr1 = rep1sep(expr2, read("*"));
+  const expr = rep1sep(expr1, read("+"));
+  const env = { expr: expr };
+
+  const ok1 = parse(expr, "1", env);
+  tassert<Same<typeof ok1, [[["1"]], ""]>>();
+  eq(ok1, [[["1"]], ""]);
+
+  const ok2 = parse(expr, "(123)", env);
+  tassert<Same<typeof ok2, [[[[["123"]]]], ""]>>();
+  eq(ok2, [[[[["123"]]]], ""]);
+
+  const ok3 = parse(expr, "1+2", env);
+  tassert<Same<typeof ok3, [[["1"], ["2"]], ""]>>();
+  eq(ok3, [[["1"], ["2"]], ""]);
+
+  const ok4 = parse(expr, "1+2*3+4", env);
+  tassert<Same<typeof ok4, [[["1"], ["2", "3"], ["4"]], ""]>>();
+  eq(ok4, [[["1"], ["2", "3"], ["4"]], ""]);
+
+  const ok5 = parse(expr, "1+2*(3+4)", env);
+  tassert<Same<typeof ok5, [[["1"], ["2", [["3"], ["4"]]]], ""]>>();
+  eq(ok5, [[["1"], ["2", [["3"], ["4"]]]], ""]);
 });

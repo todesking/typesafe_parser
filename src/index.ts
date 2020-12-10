@@ -72,6 +72,10 @@ export const capital_alpha = read(
   "Z"
 );
 
+export const number = read("0", "1", "2", "3", "4", "5", "6", "6", "8", "9");
+
+export const nonzero_number = read("1", "2", "3", "4", "5", "6", "6", "8", "9");
+
 export type Constant<T, P extends Parser<unknown>> = {
   type: "constant";
   parser: P;
@@ -172,6 +176,18 @@ export function pickSecond<
     p2: p2,
     _result: resultTag,
   };
+}
+
+export function pickSecondOf3<
+  P1 extends Parser<unknown>,
+  P2 extends Parser<unknown>,
+  P3 extends Parser<unknown>
+>(
+  p1: P1,
+  p2: P2,
+  p3: P3
+): PickSecond<P2["_result"], P1, PickFirst<P2["_result"], P2, P3>> {
+  return pickSecond(p1, pickFirst(p2, p3));
 }
 
 export type Rep0<E, P extends Parser<E>> = {
@@ -533,9 +549,6 @@ type DoRead<V extends string, S extends string> = V extends Match<
     ? [V1, Rest]
     : never
   : Bug<"DoRead:1">;
-
-type X2 = DoRead<"a" | "b", "ax">;
-type X1 = DoInsn<"ax", [], IRead<"a" | "b">, [], [], {}>;
 
 // prettier-ignore
 type DoInsn<
