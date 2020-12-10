@@ -572,7 +572,7 @@ type DoInsn<
   : I extends IPush<infer V> ?
     State<S, [V, ...Vs], Is, IStack, Env>
   : I extends IPop ?
-    Vs extends [infer V1, ...infer V2]
+    Vs extends [unknown, ...infer V2]
     ? State<S, V2, Is, IStack, Env>
     : Bug<"DoInsn:IPop: Value stack is empty">
   : I extends IAbort ?
@@ -592,7 +592,7 @@ type DoInsn<
       ? State<S, [[...V2, V1], ...V3], [ICall<I2>, IRep<I2>, ...Is], IStack, Env>
       : Bug<["DoInsn:IRep", S, Vs, I, Is, IStack, Env]>
   : I extends IOpt<infer V1> ?
-    Vs extends [Match<infer F, Fail<unknown>>, ...infer V2]
+    Vs extends [Fail<unknown>, ...infer V2]
     ? State<S, [V1, ...V2], Is, IStack, Env>
     : State<S, Vs, Is, IStack, Env>
   : I extends IPrepend ?
@@ -757,7 +757,7 @@ export function parse(
       return parse_error(s, p);
     }
     case "constant": {
-      const [v1, s1] = parse(p.parser, s, env);
+      const [, s1] = parse(p.parser, s, env);
       return [p.value, s1];
     }
     case "choose":

@@ -21,7 +21,6 @@ import {
   nonzero_number,
   number,
   pickSecondOf3,
-  Compile,
 } from "./";
 
 function str(s: string): string {
@@ -267,6 +266,7 @@ test("rep1", () => {
 test("rep1 rec limit", () => {
   const parser = rep1(read_const("x", 1 as const));
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const ok1: [
     [
       1,
@@ -371,7 +371,6 @@ test("ref", () => {
 
 test("complex: name", () => {
   const name = join(rep1(small_alpha));
-  type X1 = Compile<typeof name>;
 
   const ok1 = parse(name, "abcdefghijklmn aaa", {});
   const ex1 = makeTuple("abcdefghijklmn" as const, " aaa" as const);
