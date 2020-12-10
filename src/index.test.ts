@@ -18,6 +18,8 @@ import {
   rep0sep,
   opt,
   ref,
+  small_alpha,
+  capital_alpha,
   Compile,
 } from "./";
 
@@ -37,7 +39,7 @@ function eq<T>(actual: T, expected: T): void {
 }
 
 function makeTuple<T extends unknown[]>(...items: T): T {
-  return items
+  return items;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -365,35 +367,7 @@ test("ref", () => {
 });
 
 test("complex: name", () => {
-  const alpha = read(
-    "a",
-    "b",
-    "c",
-    "d",
-    "e",
-    "f",
-    "g",
-    "h",
-    "i",
-    "j",
-    "k",
-    "l",
-    "m",
-    "n",
-    "o",
-    "p",
-    "q",
-    "r",
-    "s",
-    "t",
-    "u",
-    "v",
-    "w",
-    "x",
-    "y",
-    "z"
-  );
-  const name = join(rep1(alpha));
+  const name = join(rep1(small_alpha));
   type X1 = Compile<typeof name>;
 
   const ok1 = parse(name, "abcdefghijklmn aaa", {});
@@ -402,15 +376,21 @@ test("complex: name", () => {
   eq(ok1, ex1);
 });
 
-test("complex: expr", () => {
-  // expr := name | tuple
-  // name := /a+/
-  // tuple := '(' expr (',' expr)* ')'
-  type Name = string;
-  type Tuple = Expr[];
-  type Expr = Name | Tuple;
+test("complex: capital name", () => {
+  const name = join(prepend(capital_alpha, rep0(small_alpha)));
+  const env = {};
 
-  const exprRef = ref<Expr>()("expr");
+  const ok1 = parse(name, "A", env);
+  tassert<Same<typeof ok1, ["A", ""]>>();
+  eq(ok1, ["A", ""]);
+
+  const ok2 = parse(name, "Foo!", env);
+  tassert<Same<typeof ok2, ["Foo", "!"]>>();
+  eq(ok2, ["Foo", "!"]);
+});
+
+test("complex: nested", () => {
+  const exprRef = ref<unknown>()("expr");
   const name = join(rep1(read("a")));
   const tuple = wrap(read("("), rep0sep(exprRef, read(",")), read(")"));
   const expr = choose(name, tuple);

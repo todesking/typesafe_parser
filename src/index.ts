@@ -14,6 +14,64 @@ export function read<P extends string[]>(...p: P): Read<P[number]> {
   };
 }
 
+export const small_alpha = read(
+  "a",
+  "b",
+  "c",
+  "d",
+  "e",
+  "f",
+  "g",
+  "h",
+  "i",
+  "j",
+  "k",
+  "l",
+  "m",
+  "n",
+  "o",
+  "p",
+  "q",
+  "r",
+  "s",
+  "t",
+  "u",
+  "v",
+  "w",
+  "x",
+  "y",
+  "z"
+);
+
+export const capital_alpha = read(
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "Q",
+  "R",
+  "S",
+  "T",
+  "U",
+  "V",
+  "W",
+  "X",
+  "Y",
+  "Z"
+);
+
 export type Constant<T, P extends Parser<unknown>> = {
   type: "constant";
   parser: P;
@@ -287,11 +345,11 @@ type Bug<Msg> = { bug: Msg };
 type _Join<T extends string[]> =
   string[] extends T ? string
   : _Join1<T, ''>
-type _Join1<T extends string[], R extends string> =
-  T extends [] ? R
+type _Join1<T extends string[], R extends string> = T extends []
+  ? R
   : T extends [Match<infer T1, string>, ...Match<infer T2, string[]>]
-    ? _Join1<T2, `${R}${T1}`>
-    : never;
+  ? _Join1<T2, `${R}${T1}`>
+  : never;
 
 // https://github.com/microsoft/TypeScript/issues/27024#issuecomment-421529650
 type Same<T, U> = (<X>() => X extends T ? 1 : 2) extends <X>() => X extends U
