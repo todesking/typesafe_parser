@@ -20,7 +20,6 @@ import {
   capital_alpha,
   nonzero_number,
   number,
-  pickSecondOf3,
   anyChar,
   not,
 } from "./";
@@ -460,7 +459,7 @@ test("complex: expr", () => {
   // expr2 = num | '(' expr ')'
   const exprRef = ref<unknown>()("expr");
   const num = join(prepend(nonzero_number, rep0(number)));
-  const paren = pickSecondOf3(read("("), exprRef, read(")"));
+  const paren = wrap(read("("), exprRef, read(")"));
   const expr2 = choose(num, paren);
   const expr1 = rep1sep(expr2, read("*"));
   const expr = rep1sep(expr1, read("+"));
