@@ -22,6 +22,7 @@ import {
   number,
   pickSecondOf3,
   anyChar,
+  not,
 } from "./";
 
 function str(s: string): string {
@@ -384,6 +385,22 @@ test("ref", () => {
   const ok1 = parse(parser, "a", env);
   tassert<Same<typeof ok1, ["a", ""]>>();
   eq(ok1, ["a", ""]);
+});
+
+test("not", () => {
+  const not_aaa = not(read("aaa"), join(rep0(anyChar())));
+
+  const ok1 = parse(not_aaa, "", {});
+  tassert<Same<typeof ok1, ["", ""]>>();
+  eq(ok1, ["", ""]);
+
+  const ok2 = parse(not_aaa, "abc", {});
+  tassert<Same<typeof ok2, ["abc", ""]>>();
+  eq(ok2, ["abc", ""]);
+
+  expect(() => {
+    ensureFail(parse(not_aaa, "aaa", {}));
+  }).toThrow();
 });
 
 test("complex: name", () => {

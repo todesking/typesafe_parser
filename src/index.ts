@@ -130,6 +130,25 @@ export function choose<P1 extends Parser<unknown>, P2 extends Parser<unknown>>(
   };
 }
 
+export type Not<T, P1 extends Parser<unknown>, P2 extends Parser<T>> = {
+  type: "not";
+  p1: P1;
+  p2: P2;
+  _result: T;
+};
+
+export function not<P1 extends Parser<unknown>, P2 extends Parser<unknown>>(
+  p1: P1,
+  p2: P2
+): Not<P2["_result"], P1, P2> {
+  return {
+    type: "not",
+    p1: p1,
+    p2: p2,
+    _result: resultTag,
+  };
+}
+
 export type Seq<T1, T2, P1 extends Parser<T1>, P2 extends Parser<T2>> = {
   type: "seq";
   p1: P1;
@@ -335,6 +354,7 @@ export type Parser<T> =
   | (AnyChar & { _result: T })
   | (Read<string> & { _result: T })
   | ConstantRec<T>
+  | NotRec<T>
   | ChooseRec<T>
   | (SeqRec & { _result: T })
   | PickFirstRec<T>
@@ -350,6 +370,7 @@ type ParseResult<P extends Parser<unknown>> = P[] extends Parser<infer T>[]
   : never;
 
 interface ConstantRec<T> extends Constant<T, Parser<unknown>> {}
+interface NotRec<T> extends Not<T, Parser<unknown>, Parser<T>> {}
 interface ChooseRec<T> extends Choose<T, Parser<T>, Parser<T>> {}
 interface SeqRec
   extends Seq<unknown, unknown, Parser<unknown>, Parser<unknown>> {}
@@ -394,9 +415,15 @@ type IRead<V extends string> = {
 type ISeq = {
   itype: "seq";
 };
+type INot = {
+  itype: "not";
+};
 type IPush<V> = {
   itype: "push";
   value: V;
+};
+type IPushS = {
+  itype: "push_s";
 };
 type IPop = {
   itype: "pop";
@@ -434,8 +461,10 @@ type ICall<I extends Insn[]> = {
 type Insn =
   | IAnyChar
   | IRead<string>
+  | INot
   | ISeq
   | IPush<unknown>
+  | IPushS
   | IPop
   | IAbort
   | IChoose<Insn[]>
@@ -455,8 +484,14 @@ export type Compile<P extends Parser<unknown>> =
   : P extends Read<infer V> ? [IRead<V>]
   : P extends Constant<infer V, infer P1> ?
     Compile<P1> extends Match<infer I1, Insn[]>
-      ?  [ICall<I1>, IAbort, IPop, IPush<V>]
-      : Bug<"Compile:Constant:1">
+    ?  [ICall<I1>, IAbort, IPop, IPush<V>]
+    : Bug<"Compile:Constant:1">
+  : P extends Not<unknown, infer P1, infer P2> ?
+    Compile<P1> extends Match<infer I1, Insn[]>
+    ? Compile<P2> extends Match<infer I2, Insn[]>
+      ? [IPushS, ...I1, INot, IAbort, ...I2]
+      : Bug<"Compile:Not:1">
+    : Bug<"Compile:Not:2">
   : P extends Choose<unknown, infer P1, infer P2> ?
     Compile<P1> extends Match<infer I1, Insn[]>
     ? Compile<P2> extends Match<infer I2, Insn[]>
@@ -584,12 +619,20 @@ type DoInsn<
       : DoRead<V, S> extends [infer V1, Match<infer S1, string>]
         ? State<S1, [V1, ...Vs], Is, IStack, Env>
         : Bug<"Read:1">
-  : I extends ISeq
-    ? Vs extends [infer V1, infer V2, ...infer V3]
+  : I extends ISeq ?
+    Vs extends [infer V1, infer V2, ...infer V3]
       ? State<S, [[V2, V1], ...V3], Is, IStack, Env>
       : Bug<["DoInsn:ISeq:Stack inssuficient", Vs]>
+  : I extends INot ? 
+    Vs extends [Fail<unknown>, Match<infer S1, string>, ...infer Vs2]
+    ? State<S1, Vs2, Is, IStack, Env>
+    : Vs extends [unknown, ...infer Vs2]
+      ? State<S, [Fail<"Not">, ...Vs2], Is, IStack, Env>
+      : Bug<'INot'>
   : I extends IPush<infer V> ?
     State<S, [V, ...Vs], Is, IStack, Env>
+  : I extends IPushS ?
+    State<S, [S, ...Vs], Is, IStack, Env>
   : I extends IPop ?
     Vs extends [unknown, ...infer V2]
     ? State<S, V2, Is, IStack, Env>
@@ -792,6 +835,14 @@ export function parse(
       const [v1, s1] = parse(p.p1, s, env);
       const [v2, s2] = parse(p.p2, s1, env);
       return [[v1, v2], s2];
+    }
+    case "not": {
+      try {
+        parse(p.p1, s, env);
+      } catch {
+        return parse(p.p2, s, env);
+      }
+      return parse_error("not", p);
     }
     case "pickFirst": {
       const [v1, s1] = parse(p.p1, s, env);
