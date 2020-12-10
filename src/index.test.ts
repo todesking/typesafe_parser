@@ -21,6 +21,7 @@ import {
   nonzero_number,
   number,
   pickSecondOf3,
+  anyChar,
 } from "./";
 
 function str(s: string): string {
@@ -59,6 +60,22 @@ test("read", () => {
   }).toThrow();
   expect(() => {
     ensureFail(parse(parser, "ba", {}));
+  }).toThrow();
+});
+
+test("anyChar", () => {
+  const ch = anyChar();
+
+  const ok1 = parse(ch, "a", {});
+  tassert<Same<typeof ok1, ["a", ""]>>();
+  eq(ok1, ["a", ""]);
+
+  const ok2 = parse(ch, "ab", {});
+  tassert<Same<typeof ok2, ["a", "b"]>>();
+  eq(ok2, ["a", "b"]);
+
+  expect(() => {
+    ensureFail(parse(ch, "", {}));
   }).toThrow();
 });
 

@@ -1,5 +1,14 @@
 const resultTag: any = null;
 
+export type AnyChar = {
+  type: "any_char";
+  _result: string;
+};
+
+export function anyChar(): AnyChar {
+  return { type: "any_char", _result: resultTag };
+}
+
 export type Read<P extends string> = {
   type: "read";
   pattern: P[];
@@ -323,6 +332,7 @@ export function ref<T>(): <K extends string>(key: K) => Ref<T, K> {
 }
 
 export type Parser<T> =
+  | (AnyChar & { _result: T })
   | (Read<string> & { _result: T })
   | ConstantRec<T>
   | ChooseRec<T>
@@ -374,6 +384,9 @@ type Same<T, U> = (<X>() => X extends T ? 1 : 2) extends <X>() => X extends U
   ? true
   : false;
 
+type IAnyChar = {
+  itype: "any_char";
+};
 type IRead<V extends string> = {
   itype: "read";
   value: V;
@@ -419,6 +432,7 @@ type ICall<I extends Insn[]> = {
 };
 
 type Insn =
+  | IAnyChar
   | IRead<string>
   | ISeq
   | IPush<unknown>
@@ -437,6 +451,7 @@ type Insn =
 export type Compile<P extends Parser<unknown>> =
   Same<Parser<ParseResult<P>>, P> extends true ?
     [IPush<ParseResult<P>>]
+  : P extends AnyChar ? [IAnyChar]
   : P extends Read<infer V> ? [IRead<V>]
   : P extends Constant<infer V, infer P1> ?
     Compile<P1> extends Match<infer I1, Insn[]>
@@ -559,7 +574,11 @@ type DoInsn<
   IStack extends Insn[][],
   Env extends Record<string, Insn[]>
 > =
-  I extends IRead<infer V> ?
+  I extends IAnyChar ?
+    S extends `${infer S1}${infer S2}`
+    ? State<S2, [S1, ...Vs], Is, IStack, Env>
+    : State<S, [Fail<'AnyChar'>, ...Vs], Is, IStack, Env>
+  : I extends IRead<infer V> ?
     DoRead<V, S> extends never
       ? State<S, [Fail<["Read", V, S]>, ...Vs], Is, IStack, Env>
       : DoRead<V, S> extends [infer V1, Match<infer S1, string>]
@@ -748,6 +767,9 @@ export function parse(
   env: Environment
 ): [unknown, string] {
   switch (p.type) {
+    case "any_char":
+      if (s.length === 0) parse_error(s, p);
+      return [s[0], s.substr(1)];
     case "read": {
       for (const pat of p.pattern) {
         if (s.startsWith(pat)) {
